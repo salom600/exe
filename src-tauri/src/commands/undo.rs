@@ -80,7 +80,10 @@ pub fn undo_action(
         // Apply the undo action to the project state.
         // This is a simplified implementation — the actual reversal logic
         // would depend on the action_type and be much more complex.
-        log::info!("Applied undo for action '{}' to project state", action.action_type);
+        log::info!(
+            "Applied undo for action '{}' to project state",
+            action.action_type
+        );
         // Update the project after undo
         project_state.update_project(project);
     }
@@ -135,7 +138,10 @@ pub fn redo_action(
     // Re-apply the action to the project state if a project is open.
     if let Some(project) = project_state.get_current_project() {
         // Apply the redo action to the project state.
-        log::info!("Applied redo for action '{}' to project state", action.action_type);
+        log::info!(
+            "Applied redo for action '{}' to project state",
+            action.action_type
+        );
         // Update the project after redo
         project_state.update_project(project);
     }

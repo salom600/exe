@@ -111,11 +111,11 @@ fn clip_to_info(c: &Clip) -> ClipInfo {
         duration: c.duration,
         in_point: c.in_point,
         out_point: c.out_point,
-        label: None, // The internal Clip doesn't have a label field
+        label: None,   // The internal Clip doesn't have a label field
         locked: false, // The internal Clip doesn't have a locked field
-        muted: false, // The internal Clip doesn't have a muted field
-        volume: 1.0, // Default volume
-        opacity: 1.0, // Default opacity
+        muted: false,  // The internal Clip doesn't have a muted field
+        volume: 1.0,   // Default volume
+        opacity: 1.0,  // Default opacity
     }
 }
 
@@ -547,9 +547,7 @@ pub fn split_clip(
     let track_idx = track_idx.unwrap();
 
     // Find the clip
-    let clip_idx = project
-        .timeline
-        .tracks[track_idx]
+    let clip_idx = project.timeline.tracks[track_idx]
         .clips
         .iter()
         .position(|c| c.id == parsed_clip_uuid);
@@ -611,19 +609,11 @@ pub fn split_clip(
     };
 
     // Remove the original clip and add the two new clips
-    project
-        .timeline
-        .tracks[track_idx]
-        .clips
-        .remove(clip_idx);
-    project
-        .timeline
-        .tracks[track_idx]
+    project.timeline.tracks[track_idx].clips.remove(clip_idx);
+    project.timeline.tracks[track_idx]
         .clips
         .push(left_clip.clone());
-    project
-        .timeline
-        .tracks[track_idx]
+    project.timeline.tracks[track_idx]
         .clips
         .push(right_clip.clone());
 

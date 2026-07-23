@@ -130,8 +130,8 @@ pub fn initialize_engine(engine_state: State<EngineState>) -> Result<bool, Engin
         log::info!("Engine already initialized — re-probing system capabilities");
         // Re-initialize with placeholder probe data
         engine_state.initialize(
-            true,      // ffmpeg_available
-            false,     // gpu_available (placeholder)
+            true,  // ffmpeg_available
+            false, // gpu_available (placeholder)
             vec![
                 "mp4".to_string(),
                 "mkv".to_string(),

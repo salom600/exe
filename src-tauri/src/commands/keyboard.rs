@@ -139,9 +139,9 @@ pub fn set_shortcut(
     }
 
     // Check for conflicts with other shortcuts
-    let conflict = defaults.iter().find(|s| {
-        s.key == key && s.modifiers == modifiers && s.action != action
-    });
+    let conflict = defaults
+        .iter()
+        .find(|s| s.key == key && s.modifiers == modifiers && s.action != action);
     if let Some(conflicting) = conflict {
         return Err(ShortcutError {
             kind: "conflict".into(),

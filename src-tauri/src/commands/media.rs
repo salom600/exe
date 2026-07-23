@@ -83,7 +83,11 @@ fn internal_to_media_item(m: &InternalMediaItem) -> MediaItem {
         height: if m.height > 0 { Some(m.height) } else { None },
         video_codec,
         audio_codec,
-        frame_rate: if m.frame_rate > 0.0 { Some(m.frame_rate) } else { None },
+        frame_rate: if m.frame_rate > 0.0 {
+            Some(m.frame_rate)
+        } else {
+            None
+        },
         total_frames: if m.frame_rate > 0.0 && m.duration > 0.0 {
             Some((m.duration * m.frame_rate) as u64)
         } else {
@@ -238,10 +242,7 @@ pub fn get_media_info(
     })?;
 
     // Find the media item in the project's media pool
-    let media = project
-        .media_pool
-        .iter()
-        .find(|m| m.id == parsed_uuid);
+    let media = project.media_pool.iter().find(|m| m.id == parsed_uuid);
 
     if media.is_none() {
         return Err(MediaError {
@@ -286,10 +287,7 @@ pub fn remove_media(
     })?;
 
     // Find the media item before removal for undo recording
-    let media_idx = project
-        .media_pool
-        .iter()
-        .position(|m| m.id == parsed_uuid);
+    let media_idx = project.media_pool.iter().position(|m| m.id == parsed_uuid);
 
     if media_idx.is_none() {
         return Err(MediaError {

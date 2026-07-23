@@ -102,10 +102,7 @@ pub fn render_preview_frame(
     // base64-encoded 1x1 transparent PNG.
     let placeholder_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPj/HwAFcAJN2e0zAAAAAElFTkSuQmCC";
 
-    log::debug!(
-        "Preview frame rendered: {:.3}s (placeholder)",
-        timestamp
-    );
+    log::debug!("Preview frame rendered: {:.3}s (placeholder)", timestamp);
 
     Ok(placeholder_png.to_string())
 }
@@ -155,10 +152,7 @@ pub fn get_preview_info(
         message: format!("Invalid media ID format: {}", e),
     })?;
 
-    let media = project
-        .media_pool
-        .iter()
-        .find(|m| m.id == parsed_uuid);
+    let media = project.media_pool.iter().find(|m| m.id == parsed_uuid);
 
     if media.is_none() {
         return Err(PreviewError {
