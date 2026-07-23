@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::project::{MediaItem as InternalMediaItem, MediaType, Project, ProjectState};
+use crate::project::{MediaItem as InternalMediaItem, MediaType, ProjectState};
 use crate::utils::{ActionRecord, UndoManager};
 
 /// A complete descriptor for a media item in the project library.
@@ -171,7 +171,7 @@ pub fn import_media(
 
         let media_item = InternalMediaItem {
             id: uuid::Uuid::new_v4(),
-            name: filename,
+            name: filename.clone(),
             path: file_path.clone(),
             media_type,
             duration: 0.0, // Would be analyzed by FFmpeg in a real implementation

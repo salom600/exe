@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::State;
 
-use crate::project::{Clip, FilterInstance, ProjectState, Track};
+use crate::project::{FilterInstance, ProjectState};
 use crate::utils::{ActionRecord, UndoManager};
 
 /// Describes a filter instance applied to a clip.
@@ -522,7 +522,7 @@ pub fn update_filter_params(
     let mut filter_found = false;
     let mut original_params: Option<Value> = None;
     let mut result_info: Option<FilterInfo> = None;
-    let mut found_clip_id: Option<String> = None;
+    let mut _found_clip_id: Option<String> = None;
 
     for track in &mut project.timeline.tracks {
         for clip in &mut track.clips {
@@ -539,7 +539,7 @@ pub fn update_filter_params(
                         order: filter.order,
                         name: format!("{} #{}", filter.filter_type, filter.id),
                     });
-                    found_clip_id = Some(clip.id.to_string());
+                    _found_clip_id = Some(clip.id.to_string());
                     filter_found = true;
                     break;
                 }

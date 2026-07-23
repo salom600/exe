@@ -53,21 +53,25 @@ pub fn get_shortcuts(
     let defaults = crate::utils::default_shortcuts();
 
     // Check if there's a current project with custom shortcuts
-    let current_project = project_state.get_current_project();
+    let _current_project = project_state.get_current_project();
 
     // Build the shortcut definitions, merging defaults with any
     // project-specific overrides
     let definitions: Vec<ShortcutDefinition> = defaults
         .into_iter()
-        .map(|s| ShortcutDefinition {
-            action: s.action,
-            key: s.key,
-            modifiers: s.modifiers,
-            description: s.description,
-            context: "global".to_string(),
-            customizable: true,
-            default_key: s.key.clone(),
-            default_modifiers: s.modifiers.clone(),
+        .map(|s| {
+            let key_clone = s.key.clone();
+            let mods_clone = s.modifiers.clone();
+            ShortcutDefinition {
+                action: s.action,
+                key: key_clone.clone(),
+                modifiers: mods_clone.clone(),
+                description: s.description,
+                context: "global".to_string(),
+                customizable: true,
+                default_key: key_clone,
+                default_modifiers: mods_clone,
+            }
         })
         .collect();
 

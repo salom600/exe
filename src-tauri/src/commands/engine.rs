@@ -276,7 +276,7 @@ pub fn get_system_info(engine_state: State<EngineState>) -> Result<SystemInfo, E
     log::info!("Retrieving system information");
 
     // Check if the engine is initialized to provide meaningful data
-    let is_init = *engine_state.is_initialized.lock().unwrap();
+    let _is_init = *engine_state.is_initialized.lock().unwrap();
     let gpu_avail = *engine_state.gpu_available.lock().unwrap();
 
     Ok(SystemInfo {

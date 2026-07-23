@@ -142,15 +142,15 @@ fn track_to_info(t: &Track, order: u32) -> TrackInfo {
 
 /// Helper to recalculate the timeline duration from all clips.
 fn recalculate_timeline_duration(project: &mut Project) {
-    let max_end = project
+    let max_end: f64 = project
         .timeline
         .tracks
         .iter()
         .flat_map(|t| t.clips.iter())
         .map(|c| c.start_time + c.duration)
-        .max();
+        .fold(0.0, f64::max);
 
-    project.timeline.duration = max_end.unwrap_or(0.0);
+    project.timeline.duration = max_end;
 }
 
 /// Adds a clip to a track on the timeline.
@@ -451,7 +451,7 @@ pub fn move_clip(
     }
 
     let clip = clip.unwrap();
-    let original_start_time = clip.start_time;
+    let _original_start_time = clip.start_time;
 
     // Move the clip
     clip.start_time = new_start_time;
@@ -741,7 +741,7 @@ pub fn trim_clip(
     let original_duration = clip.duration;
     let original_in_point = clip.in_point;
     let original_out_point = clip.out_point;
-    let original_start_time = clip.start_time;
+    let _original_start_time = clip.start_time;
 
     // Apply the trim
     clip.start_time += start_trim;
