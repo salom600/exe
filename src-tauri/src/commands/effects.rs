@@ -125,7 +125,9 @@ pub fn apply_filter(
 ) -> Result<FilterInfo, FilterError> {
     log::info!(
         "Applying filter: clip={}, type={}, params={}",
-        clip_id, filter_type, params
+        clip_id,
+        filter_type,
+        params
     );
 
     if clip_id.trim().is_empty() {
@@ -168,23 +170,24 @@ pub fn apply_filter(
         })?;
 
     // Apply default params if none were provided
-    let effective_params = if params.is_null() || (params.is_object() && params.as_object().unwrap().is_empty()) {
-        project
-            .get_filter_defaults(&filter_type)
-            .map_err(|e| FilterError {
-                kind: "defaults_failed".into(),
-                message: format!("Failed to get default params for '{}': {}", filter_type, e),
-            })?
-    } else {
-        // Validate provided params against the filter's schema
-        project
-            .validate_filter_params(&filter_type, &params)
-            .map_err(|e| FilterError {
-                kind: "invalid_params".into(),
-                message: format!("Invalid parameters for filter '{}': {}", filter_type, e),
-            })?;
-        params
-    };
+    let effective_params =
+        if params.is_null() || (params.is_object() && params.as_object().unwrap().is_empty()) {
+            project
+                .get_filter_defaults(&filter_type)
+                .map_err(|e| FilterError {
+                    kind: "defaults_failed".into(),
+                    message: format!("Failed to get default params for '{}': {}", filter_type, e),
+                })?
+        } else {
+            // Validate provided params against the filter's schema
+            project
+                .validate_filter_params(&filter_type, &params)
+                .map_err(|e| FilterError {
+                    kind: "invalid_params".into(),
+                    message: format!("Invalid parameters for filter '{}': {}", filter_type, e),
+                })?;
+            params
+        };
 
     let result = project
         .apply_filter(&clip_id, &filter_type, &effective_params)
@@ -194,12 +197,15 @@ pub fn apply_filter(
         })?;
 
     undo_manager
-        .record_action("apply_filter", serde_json::json!({
-            "filter_id": result.id.clone(),
-            "clip_id": clip_id.clone(),
-            "filter_type": filter_type.clone(),
-            "params": effective_params.clone(),
-        }))
+        .record_action(
+            "apply_filter",
+            serde_json::json!({
+                "filter_id": result.id.clone(),
+                "clip_id": clip_id.clone(),
+                "filter_type": filter_type.clone(),
+                "params": effective_params.clone(),
+            }),
+        )
         .map_err(|e| FilterError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -275,13 +281,16 @@ pub fn remove_filter(
     })?;
 
     undo_manager
-        .record_action("remove_filter", serde_json::json!({
-            "filter_id": filter_id.clone(),
-            "clip_id": filter_info.clip_id.clone(),
-            "filter_type": filter_info.filter_type.clone(),
-            "params": filter_info.params.clone(),
-            "order": filter_info.order,
-        }))
+        .record_action(
+            "remove_filter",
+            serde_json::json!({
+                "filter_id": filter_id.clone(),
+                "clip_id": filter_info.clip_id.clone(),
+                "filter_type": filter_info.filter_type.clone(),
+                "params": filter_info.params.clone(),
+                "order": filter_info.order,
+            }),
+        )
         .map_err(|e| FilterError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -414,7 +423,11 @@ pub fn update_filter_params(
     project_state: State<ProjectState>,
     undo_manager: State<UndoManager>,
 ) -> Result<FilterInfo, FilterError> {
-    log::info!("Updating filter params: filter={}, params={}", filter_id, params);
+    log::info!(
+        "Updating filter params: filter={}, params={}",
+        filter_id,
+        params
+    );
 
     if filter_id.trim().is_empty() {
         return Err(FilterError {
@@ -453,7 +466,10 @@ pub fn update_filter_params(
         .validate_filter_params(&original_filter.filter_type, &params)
         .map_err(|e| FilterError {
             kind: "invalid_params".into(),
-            message: format!("Invalid parameters for filter '{}': {}", original_filter.filter_type, e),
+            message: format!(
+                "Invalid parameters for filter '{}': {}",
+                original_filter.filter_type, e
+            ),
         })?;
 
     let result = project
@@ -464,11 +480,14 @@ pub fn update_filter_params(
         })?;
 
     undo_manager
-        .record_action("update_filter_params", serde_json::json!({
-            "filter_id": filter_id.clone(),
-            "original_params": original_filter.params.clone(),
-            "new_params": params.clone(),
-        }))
+        .record_action(
+            "update_filter_params",
+            serde_json::json!({
+                "filter_id": filter_id.clone(),
+                "original_params": original_filter.params.clone(),
+                "new_params": params.clone(),
+            }),
+        )
         .map_err(|e| FilterError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),

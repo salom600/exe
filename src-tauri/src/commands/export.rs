@@ -180,7 +180,9 @@ pub fn start_export(
 ) -> Result<String, ExportError> {
     log::info!(
         "Starting export: path={}, format={}, codec={}",
-        config.output_path, config.format, config.video_codec
+        config.output_path,
+        config.format,
+        config.video_codec
     );
 
     // Validate essential config fields
@@ -243,7 +245,8 @@ pub fn start_export(
     if !engine.is_initialized() {
         return Err(ExportError {
             kind: "engine_not_initialized".into(),
-            message: "The video engine has not been initialized. Call initialize_engine first.".into(),
+            message: "The video engine has not been initialized. Call initialize_engine first."
+                .into(),
         });
     }
 
@@ -259,7 +262,8 @@ pub fn start_export(
     if export.has_active_job() {
         return Err(ExportError {
             kind: "job_already_active".into(),
-            message: "An export job is already running. Cancel it before starting a new one.".into(),
+            message: "An export job is already running. Cancel it before starting a new one."
+                .into(),
         });
     }
 
@@ -311,12 +315,10 @@ pub fn get_export_progress(
         message: format!("Failed to acquire export state lock: {}", e),
     })?;
 
-    let progress = export
-        .get_progress(&job_id)
-        .map_err(|e| ExportError {
-            kind: "job_not_found".into(),
-            message: format!("Export job '{}' not found: {}", job_id, e),
-        })?;
+    let progress = export.get_progress(&job_id).map_err(|e| ExportError {
+        kind: "job_not_found".into(),
+        message: format!("Export job '{}' not found: {}", job_id, e),
+    })?;
 
     Ok(ExportProgress {
         job_id: progress.job_id,

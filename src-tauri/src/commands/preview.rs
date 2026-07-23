@@ -114,7 +114,8 @@ pub fn render_preview_frame(
     if !engine.is_initialized() {
         return Err(PreviewError {
             kind: "engine_not_initialized".into(),
-            message: "The video engine has not been initialized. Call initialize_engine first.".into(),
+            message: "The video engine has not been initialized. Call initialize_engine first."
+                .into(),
         });
     }
 
@@ -338,12 +339,10 @@ pub fn seek_preview(
         });
     }
 
-    engine
-        .seek(timestamp)
-        .map_err(|e| PreviewError {
-            kind: "seek_failed".into(),
-            message: format!("Failed to seek preview: {}", e),
-        })?;
+    engine.seek(timestamp).map_err(|e| PreviewError {
+        kind: "seek_failed".into(),
+        message: format!("Failed to seek preview: {}", e),
+    })?;
 
     log::info!("Preview seeked to {:.3}s successfully", timestamp);
     Ok(true)

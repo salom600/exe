@@ -180,7 +180,9 @@ pub fn set_shortcut(
 ) -> Result<bool, ShortcutError> {
     log::info!(
         "Setting shortcut: action={}, key={}, modifiers={}",
-        action, key, modifiers
+        action,
+        key,
+        modifiers
     );
 
     if action.trim().is_empty() {

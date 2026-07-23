@@ -133,19 +133,18 @@ pub fn undo_action(
 
     log::info!(
         "Undoing action: type='{}', description='{}'",
-        action.action_type, action.description
+        action.action_type,
+        action.description
     );
 
     // Apply the reversal to the project state
-    project
-        .apply_undo(&action)
-        .map_err(|e| UndoError {
-            kind: "undo_apply_failed".into(),
-            message: format!(
-                "Failed to apply undo for action '{}': {}",
-                action.action_type, e
-            ),
-        })?;
+    project.apply_undo(&action).map_err(|e| UndoError {
+        kind: "undo_apply_failed".into(),
+        message: format!(
+            "Failed to apply undo for action '{}': {}",
+            action.action_type, e
+        ),
+    })?;
 
     // Push the undone action onto the redo stack
     undo.push_redo(action.clone()).map_err(|e| UndoError {
@@ -221,19 +220,18 @@ pub fn redo_action(
 
     log::info!(
         "Redoing action: type='{}', description='{}'",
-        action.action_type, action.description
+        action.action_type,
+        action.description
     );
 
     // Re-apply the action to the project state
-    project
-        .apply_redo(&action)
-        .map_err(|e| UndoError {
-            kind: "redo_apply_failed".into(),
-            message: format!(
-                "Failed to apply redo for action '{}': {}",
-                action.action_type, e
-            ),
-        })?;
+    project.apply_redo(&action).map_err(|e| UndoError {
+        kind: "redo_apply_failed".into(),
+        message: format!(
+            "Failed to apply redo for action '{}': {}",
+            action.action_type, e
+        ),
+    })?;
 
     // Push the re-applied action back onto the undo stack
     undo.push_undo(action.clone()).map_err(|e| UndoError {
@@ -274,9 +272,7 @@ pub fn redo_action(
 /// This command is read-only and does not modify the undo/redo
 /// stacks or the project state.
 #[tauri::command]
-pub fn get_undo_history(
-    undo_manager: State<UndoManager>,
-) -> Result<Vec<ActionRecord>, UndoError> {
+pub fn get_undo_history(undo_manager: State<UndoManager>) -> Result<Vec<ActionRecord>, UndoError> {
     log::info!("Retrieving undo history");
 
     let undo = undo_manager.data.lock().map_err(|e| UndoError {

@@ -116,20 +116,23 @@ pub fn create_project(
     })?;
 
     // Delegate to the project module's internal creation logic
-    let result = project.create(name.clone(), path.clone()).map_err(|e| {
-        ProjectError {
+    let result = project
+        .create(name.clone(), path.clone())
+        .map_err(|e| ProjectError {
             kind: "creation_failed".into(),
             message: format!("Failed to create project: {}", e),
-        }
-    })?;
+        })?;
 
     // Record the action for undo support
     undo_manager
-        .record_action("create_project", serde_json::json!({
-            "name": name,
-            "path": path,
-            "project_id": result.id.clone(),
-        }))
+        .record_action(
+            "create_project",
+            serde_json::json!({
+                "name": name,
+                "path": path,
+                "project_id": result.id.clone(),
+            }),
+        )
         .map_err(|e| ProjectError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -195,10 +198,13 @@ pub fn open_project(
 
     // Record the action for undo support
     undo_manager
-        .record_action("open_project", serde_json::json!({
-            "path": path,
-            "project_id": result.id.clone(),
-        }))
+        .record_action(
+            "open_project",
+            serde_json::json!({
+                "path": path,
+                "project_id": result.id.clone(),
+            }),
+        )
         .map_err(|e| ProjectError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -234,9 +240,7 @@ pub fn open_project(
 /// Saving is not recorded as an undoable action since it is a persistence
 /// operation that does not alter the logical state of the project.
 #[tauri::command]
-pub fn save_project(
-    project_state: State<ProjectState>,
-) -> Result<bool, ProjectError> {
+pub fn save_project(project_state: State<ProjectState>) -> Result<bool, ProjectError> {
     log::info!("Saving current project");
 
     let mut project = project_state.data.lock().map_err(|e| ProjectError {
@@ -279,9 +283,7 @@ pub fn save_project(
 /// workspace state. The frontend should handle re-opening via
 /// [`open_project`] if the user wishes to restore.
 #[tauri::command]
-pub fn close_project(
-    project_state: State<ProjectState>,
-) -> Result<bool, ProjectError> {
+pub fn close_project(project_state: State<ProjectState>) -> Result<bool, ProjectError> {
     log::info!("Closing current project");
 
     let mut project = project_state.data.lock().map_err(|e| ProjectError {
@@ -316,9 +318,7 @@ pub fn close_project(
 /// A [`ProjectInfo`] struct reflecting the current project, or a
 /// [`ProjectError`] if no project is currently active.
 #[tauri::command]
-pub fn get_project_info(
-    project_state: State<ProjectState>,
-) -> Result<ProjectInfo, ProjectError> {
+pub fn get_project_info(project_state: State<ProjectState>) -> Result<ProjectInfo, ProjectError> {
     log::info!("Retrieving project info");
 
     let project = project_state.data.lock().map_err(|e| ProjectError {

@@ -412,12 +412,7 @@ impl From<&Project> for ProjectInfo {
     /// the heavy timeline and media pool data.
     fn from(project: &Project) -> Self {
         let track_count = project.timeline.tracks.len();
-        let clip_count = project
-            .timeline
-            .tracks
-            .iter()
-            .map(|t| t.clips.len())
-            .sum();
+        let clip_count = project.timeline.tracks.iter().map(|t| t.clips.len()).sum();
 
         Self {
             id: project.id,

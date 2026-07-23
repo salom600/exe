@@ -157,7 +157,10 @@ pub fn add_clip_to_track(
 ) -> Result<ClipInfo, TimelineError> {
     log::info!(
         "Adding clip: track={}, media={}, start={}, duration={}",
-        track_id, media_id, start_time, duration
+        track_id,
+        media_id,
+        start_time,
+        duration
     );
 
     if track_id.trim().is_empty() {
@@ -205,13 +208,16 @@ pub fn add_clip_to_track(
         })?;
 
     undo_manager
-        .record_action("add_clip_to_track", serde_json::json!({
-            "clip_id": result.id.clone(),
-            "track_id": track_id.clone(),
-            "media_id": media_id.clone(),
-            "start_time": start_time,
-            "duration": duration,
-        }))
+        .record_action(
+            "add_clip_to_track",
+            serde_json::json!({
+                "clip_id": result.id.clone(),
+                "track_id": track_id.clone(),
+                "media_id": media_id.clone(),
+                "start_time": start_time,
+                "duration": duration,
+            }),
+        )
         .map_err(|e| TimelineError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -295,15 +301,18 @@ pub fn remove_clip_from_track(
         })?;
 
     undo_manager
-        .record_action("remove_clip_from_track", serde_json::json!({
-            "clip_id": clip_id.clone(),
-            "track_id": track_id.clone(),
-            "media_id": clip_info.media_id.clone(),
-            "start_time": clip_info.start_time,
-            "duration": clip_info.duration,
-            "in_point": clip_info.in_point,
-            "out_point": clip_info.out_point,
-        }))
+        .record_action(
+            "remove_clip_from_track",
+            serde_json::json!({
+                "clip_id": clip_id.clone(),
+                "track_id": track_id.clone(),
+                "media_id": clip_info.media_id.clone(),
+                "start_time": clip_info.start_time,
+                "duration": clip_info.duration,
+                "in_point": clip_info.in_point,
+                "out_point": clip_info.out_point,
+            }),
+        )
         .map_err(|e| TimelineError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -344,7 +353,9 @@ pub fn move_clip(
 ) -> Result<bool, TimelineError> {
     log::info!(
         "Moving clip: track={}, clip={}, new_start={}",
-        track_id, clip_id, new_start_time
+        track_id,
+        clip_id,
+        new_start_time
     );
 
     if track_id.trim().is_empty() || clip_id.trim().is_empty() {
@@ -387,12 +398,15 @@ pub fn move_clip(
         })?;
 
     undo_manager
-        .record_action("move_clip", serde_json::json!({
-            "clip_id": clip_id.clone(),
-            "track_id": track_id.clone(),
-            "original_start_time": original_start_time,
-            "new_start_time": new_start_time,
-        }))
+        .record_action(
+            "move_clip",
+            serde_json::json!({
+                "clip_id": clip_id.clone(),
+                "track_id": track_id.clone(),
+                "original_start_time": original_start_time,
+                "new_start_time": new_start_time,
+            }),
+        )
         .map_err(|e| TimelineError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -437,7 +451,9 @@ pub fn split_clip(
 ) -> Result<Vec<ClipInfo>, TimelineError> {
     log::info!(
         "Splitting clip: track={}, clip={}, split_time={}",
-        track_id, clip_id, split_time
+        track_id,
+        clip_id,
+        split_time
     );
 
     if track_id.trim().is_empty() || clip_id.trim().is_empty() {
@@ -510,12 +526,15 @@ pub fn split_clip(
         .collect();
 
     undo_manager
-        .record_action("split_clip", serde_json::json!({
-            "original_clip_id": clip_id.clone(),
-            "track_id": track_id.clone(),
-            "split_time": split_time,
-            "new_clip_ids": clip_infos.iter().map(|c| c.id.clone()).collect::<Vec<String>>(),
-        }))
+        .record_action(
+            "split_clip",
+            serde_json::json!({
+                "original_clip_id": clip_id.clone(),
+                "track_id": track_id.clone(),
+                "split_time": split_time,
+                "new_clip_ids": clip_infos.iter().map(|c| c.id.clone()).collect::<Vec<String>>(),
+            }),
+        )
         .map_err(|e| TimelineError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -561,7 +580,10 @@ pub fn trim_clip(
 ) -> Result<ClipInfo, TimelineError> {
     log::info!(
         "Trimming clip: track={}, clip={}, start_trim={}, end_trim={}",
-        track_id, clip_id, start_trim, end_trim
+        track_id,
+        clip_id,
+        start_trim,
+        end_trim
     );
 
     if track_id.trim().is_empty() || clip_id.trim().is_empty() {
@@ -621,15 +643,18 @@ pub fn trim_clip(
         })?;
 
     undo_manager
-        .record_action("trim_clip", serde_json::json!({
-            "clip_id": clip_id.clone(),
-            "track_id": track_id.clone(),
-            "original_duration": original.duration,
-            "original_in_point": original.in_point,
-            "original_out_point": original.out_point,
-            "start_trim": start_trim,
-            "end_trim": end_trim,
-        }))
+        .record_action(
+            "trim_clip",
+            serde_json::json!({
+                "clip_id": clip_id.clone(),
+                "track_id": track_id.clone(),
+                "original_duration": original.duration,
+                "original_in_point": original.in_point,
+                "original_out_point": original.out_point,
+                "start_trim": start_trim,
+                "end_trim": end_trim,
+            }),
+        )
         .map_err(|e| TimelineError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -801,11 +826,14 @@ pub fn add_track(
         })?;
 
     undo_manager
-        .record_action("add_track", serde_json::json!({
-            "track_id": result.id.clone(),
-            "track_type": track_type.clone(),
-            "name": name.clone(),
-        }))
+        .record_action(
+            "add_track",
+            serde_json::json!({
+                "track_id": result.id.clone(),
+                "track_type": track_type.clone(),
+                "name": name.clone(),
+            }),
+        )
         .map_err(|e| TimelineError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -876,20 +904,21 @@ pub fn remove_track(
         message: format!("Track '{}' not found: {}", track_id, e),
     })?;
 
-    project
-        .remove_track(&track_id)
-        .map_err(|e| TimelineError {
-            kind: "remove_track_failed".into(),
-            message: format!("Failed to remove track: {}", e),
-        })?;
+    project.remove_track(&track_id).map_err(|e| TimelineError {
+        kind: "remove_track_failed".into(),
+        message: format!("Failed to remove track: {}", e),
+    })?;
 
     undo_manager
-        .record_action("remove_track", serde_json::json!({
-            "track_id": track_id.clone(),
-            "track_type": track_info.track_type.clone(),
-            "name": track_info.name.clone(),
-            "order": track_info.order,
-        }))
+        .record_action(
+            "remove_track",
+            serde_json::json!({
+                "track_id": track_id.clone(),
+                "track_type": track_info.track_type.clone(),
+                "name": track_info.name.clone(),
+                "order": track_info.order,
+            }),
+        )
         .map_err(|e| TimelineError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -936,7 +965,10 @@ pub fn add_transition(
 ) -> Result<TransitionInfo, TimelineError> {
     log::info!(
         "Adding transition: from={}, to={}, type={}, duration={}",
-        from_clip, to_clip, transition_type, duration
+        from_clip,
+        to_clip,
+        transition_type,
+        duration
     );
 
     if from_clip.trim().is_empty() || to_clip.trim().is_empty() {
@@ -978,13 +1010,16 @@ pub fn add_transition(
         })?;
 
     undo_manager
-        .record_action("add_transition", serde_json::json!({
-            "transition_id": result.id.clone(),
-            "from_clip": from_clip.clone(),
-            "to_clip": to_clip.clone(),
-            "transition_type": transition_type.clone(),
-            "duration": duration,
-        }))
+        .record_action(
+            "add_transition",
+            serde_json::json!({
+                "transition_id": result.id.clone(),
+                "from_clip": from_clip.clone(),
+                "to_clip": to_clip.clone(),
+                "transition_type": transition_type.clone(),
+                "duration": duration,
+            }),
+        )
         .map_err(|e| TimelineError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -1060,13 +1095,16 @@ pub fn remove_transition(
         })?;
 
     undo_manager
-        .record_action("remove_transition", serde_json::json!({
-            "transition_id": transition_id.clone(),
-            "from_clip": transition_info.from_clip_id.clone(),
-            "to_clip": transition_info.to_clip_id.clone(),
-            "transition_type": transition_info.transition_type.clone(),
-            "duration": transition_info.duration,
-        }))
+        .record_action(
+            "remove_transition",
+            serde_json::json!({
+                "transition_id": transition_id.clone(),
+                "from_clip": transition_info.from_clip_id.clone(),
+                "to_clip": transition_info.to_clip_id.clone(),
+                "transition_type": transition_info.transition_type.clone(),
+                "duration": transition_info.duration,
+            }),
+        )
         .map_err(|e| TimelineError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),

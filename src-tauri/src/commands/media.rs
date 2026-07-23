@@ -143,10 +143,13 @@ pub fn import_media(
 
         // Record each import as an undoable action
         undo_manager
-            .record_action("import_media", serde_json::json!({
-                "media_id": result.id.clone(),
-                "path": file_path.clone(),
-            }))
+            .record_action(
+                "import_media",
+                serde_json::json!({
+                    "media_id": result.id.clone(),
+                    "path": file_path.clone(),
+                }),
+            )
             .map_err(|e| MediaError {
                 kind: "undo_record".into(),
                 message: format!("Failed to record undo action: {}", e),
@@ -173,7 +176,10 @@ pub fn import_media(
         });
     }
 
-    log::info!("Successfully imported {} media item(s)", imported_items.len());
+    log::info!(
+        "Successfully imported {} media item(s)",
+        imported_items.len()
+    );
     Ok(imported_items)
 }
 
@@ -304,11 +310,14 @@ pub fn remove_media(
 
     // Record the removal as an undoable action
     undo_manager
-        .record_action("remove_media", serde_json::json!({
-            "media_id": id.clone(),
-            "path": media_info.path.clone(),
-            "name": media_info.name.clone(),
-        }))
+        .record_action(
+            "remove_media",
+            serde_json::json!({
+                "media_id": id.clone(),
+                "path": media_info.path.clone(),
+                "name": media_info.name.clone(),
+            }),
+        )
         .map_err(|e| MediaError {
             kind: "undo_record".into(),
             message: format!("Failed to record undo action: {}", e),
@@ -329,9 +338,7 @@ pub fn remove_media(
 /// A vector of [`MediaItem`] structs, or a [`MediaError`] if there is
 /// no active project.
 #[tauri::command]
-pub fn list_media(
-    project_state: State<ProjectState>,
-) -> Result<Vec<MediaItem>, MediaError> {
+pub fn list_media(project_state: State<ProjectState>) -> Result<Vec<MediaItem>, MediaError> {
     log::info!("Listing all media items");
 
     let project = project_state.data.lock().map_err(|e| MediaError {

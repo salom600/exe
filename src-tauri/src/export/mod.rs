@@ -109,11 +109,15 @@ impl QualityPreset {
     /// Useful for displaying in the export configuration UI.
     pub fn description(&self) -> &'static str {
         match self {
-            QualityPreset::UltraFast => "Fastest encoding, lower quality — ideal for quick previews",
+            QualityPreset::UltraFast => {
+                "Fastest encoding, lower quality — ideal for quick previews"
+            }
             QualityPreset::Fast => "Fast encoding, good quality — ideal for test exports",
             QualityPreset::Medium => "Balanced speed and quality — recommended for most exports",
             QualityPreset::Slow => "Slower encoding, high quality — ideal for production exports",
-            QualityPreset::VerySlow => "Slowest encoding, best quality — ideal for archival masters",
+            QualityPreset::VerySlow => {
+                "Slowest encoding, best quality — ideal for archival masters"
+            }
         }
     }
 }

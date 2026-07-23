@@ -141,9 +141,7 @@ pub struct EngineError {
 /// re-probe the system and update the status, but will not interrupt
 /// any active processing tasks.
 #[tauri::command]
-pub fn initialize_engine(
-    engine_state: State<EngineState>,
-) -> Result<bool, EngineError> {
+pub fn initialize_engine(engine_state: State<EngineState>) -> Result<bool, EngineError> {
     log::info!("Initializing the video processing engine");
 
     let mut engine = engine_state.data.lock().map_err(|e| EngineError {
@@ -190,9 +188,7 @@ pub fn initialize_engine(
 /// In that case, the returned [`EngineStatus`] will have
 /// `initialized: false` and most fields will be empty or zero.
 #[tauri::command]
-pub fn get_engine_status(
-    engine_state: State<EngineState>,
-) -> Result<EngineStatus, EngineError> {
+pub fn get_engine_status(engine_state: State<EngineState>) -> Result<EngineStatus, EngineError> {
     log::info!("Retrieving engine status");
 
     let engine = engine_state.data.lock().map_err(|e| EngineError {
@@ -247,9 +243,7 @@ pub fn get_engine_status(
 /// This command performs a lightweight system probe and should complete
 /// in under 100ms. It does not depend on the engine being initialized.
 #[tauri::command]
-pub fn get_system_info(
-    engine_state: State<EngineState>,
-) -> Result<SystemInfo, EngineError> {
+pub fn get_system_info(engine_state: State<EngineState>) -> Result<SystemInfo, EngineError> {
     log::info!("Retrieving system information");
 
     let engine = engine_state.data.lock().map_err(|e| EngineError {
