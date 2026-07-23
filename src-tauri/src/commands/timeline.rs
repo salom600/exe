@@ -451,7 +451,7 @@ pub fn move_clip(
     }
 
     let clip = clip.unwrap();
-    let _original_start_time = clip.start_time;
+    let original_start_time = clip.start_time;
 
     // Move the clip
     clip.start_time = new_start_time;
