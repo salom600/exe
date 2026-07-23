@@ -5,33 +5,19 @@
 //! asynchronously — a `start_export` command initiates a background
 //! job, and the frontend can poll `get_export_progress` to track
 //! completion. Jobs can be cancelled at any time before they finish.
-//!
-//! # Export Pipeline
-//!
-//! The export pipeline composites all tracks, applies effects and
-//! transitions, encodes the result using FFmpeg, and writes the
-//! output file to the user-specified path. The pipeline runs on
-//! a background thread to avoid blocking the UI.
-//!
-//! # State Dependencies
-//!
-//! Commands depend on [`ExportState`] for managing export jobs,
-//! [`ProjectState`] for the timeline data, and [`EngineState`]
-//! for FFmpeg encoding.
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::engine::EngineState;
-use crate::export::ExportState;
+use crate::export::{ExportConfig as InternalExportConfig, ExportJob, ExportState, QualityPreset};
 use crate::project::ProjectState;
 
 /// Configuration for an export job.
 ///
 /// Encapsulates all the parameters the user specifies when exporting
 /// their project: output path, format, codec, resolution, quality,
-/// and other encoding settings. The frontend should construct this
-/// struct from the export settings panel.
+/// and other encoding settings.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExportConfig {
     /// Absolute filesystem path for the output file (including extension).
@@ -53,8 +39,7 @@ pub struct ExportConfig {
     /// Audio bitrate in kbps. 0 means use the codec's default.
     pub audio_bitrate: u32,
     /// Video quality preset (e.g. "ultrafast", "fast", "medium",
-    /// "slow", "veryslow"). Lower presets produce better quality
-    /// but take longer.
+    /// "slow", "veryslow").
     pub preset: String,
     /// Encoding profile for H.264/HEVC (e.g. "baseline", "main",
     /// "high", "high10").
@@ -69,15 +54,11 @@ pub struct ExportConfig {
     pub metadata_comment: Option<String>,
     /// Whether to embed the project's creation date as metadata.
     pub embed_creation_date: bool,
-    /// Custom FFmpeg encoding flags, passed directly to the encoder.
-    /// Use with caution; invalid flags may cause the export to fail.
+    /// Custom FFmpeg encoding flags.
     pub custom_flags: Option<String>,
 }
 
 /// Progress information for an active export job.
-///
-/// Returned by [`get_export_progress`] to allow the frontend to
-/// display a progress bar and estimated time remaining.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExportProgress {
     /// The unique job ID this progress belongs to.
@@ -90,24 +71,21 @@ pub struct ExportProgress {
     pub frames_processed: u64,
     /// Total number of frames to process.
     pub total_frames: u64,
-    /// Estimated time remaining in seconds, based on current speed.
+    /// Estimated time remaining in seconds.
     pub estimated_time_remaining: f64,
     /// Current encoding speed in frames per second.
     pub current_speed_fps: f64,
     /// Output file size so far in bytes.
     pub output_file_size: u64,
-    /// Whether the export job has completed (successfully or with error).
+    /// Whether the export job has completed.
     pub completed: bool,
-    /// Whether the export job was cancelled by the user.
+    /// Whether the export job was cancelled.
     pub cancelled: bool,
-    /// Error message if the export failed, `None` if successful.
+    /// Error message if the export failed.
     pub error: Option<String>,
 }
 
 /// Describes an available export format and its capabilities.
-///
-/// Returned by [`get_export_formats`] to populate the frontend's
-/// format selection dropdown with supported options.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExportFormat {
     /// Container format identifier (e.g. "mp4", "mov").
@@ -120,9 +98,9 @@ pub struct ExportFormat {
     pub video_codecs: Vec<String>,
     /// Supported audio codecs for this container.
     pub audio_codecs: Vec<String>,
-    /// Maximum supported resolution as a string (e.g. "3840x2160").
+    /// Maximum supported resolution as a string.
     pub max_resolution: String,
-    /// Typical file extension (e.g. ".mp4", ".mov").
+    /// Typical file extension.
     pub extension: String,
 }
 
@@ -135,42 +113,66 @@ pub struct ExportError {
     pub message: String,
 }
 
+/// Converts the command-level ExportConfig to the internal ExportConfig.
+fn to_internal_config(config: ExportConfig) -> InternalExportConfig {
+    let quality_preset = match config.preset.as_str() {
+        "ultrafast" => QualityPreset::UltraFast,
+        "fast" => QualityPreset::Fast,
+        "veryslow" => QualityPreset::VerySlow,
+        "slow" => QualityPreset::Slow,
+        _ => QualityPreset::Medium,
+    };
+
+    InternalExportConfig {
+        format: config.format,
+        codec: config.video_codec,
+        resolution_width: config.width,
+        resolution_height: config.height,
+        frame_rate: config.frame_rate,
+        bitrate: (config.video_bitrate as u64) * 1000, // kbps to bps
+        audio_codec: config.audio_codec,
+        audio_bitrate: (config.audio_bitrate as u64) * 1000, // kbps to bps
+        output_path: config.output_path,
+        quality_preset,
+    }
+}
+
+/// Converts an internal ExportJob to the command-level ExportProgress.
+fn job_to_progress(job: &ExportJob) -> ExportProgress {
+    let phase = match job.status {
+        crate::export::ExportStatus::Pending => "pending",
+        crate::export::ExportStatus::Processing => "processing",
+        crate::export::ExportStatus::Completed => "completed",
+        crate::export::ExportStatus::Failed => "failed",
+        crate::export::ExportStatus::Cancelled => "cancelled",
+    };
+
+    let (completed, cancelled, error) = match job.status {
+        crate::export::ExportStatus::Completed => (true, false, None),
+        crate::export::ExportStatus::Failed => (true, false, Some("Export failed".to_string())),
+        crate::export::ExportStatus::Cancelled => (true, true, None),
+        _ => (false, false, None),
+    };
+
+    ExportProgress {
+        job_id: job.id.to_string(),
+        phase: phase.to_string(),
+        progress: job.progress.percent,
+        frames_processed: job.progress.current_frame,
+        total_frames: job.progress.total_frames,
+        estimated_time_remaining: job.progress.estimated_remaining_seconds,
+        current_speed_fps: job.progress.current_fps,
+        output_file_size: 0,
+        completed,
+        cancelled,
+        error,
+    }
+}
+
 /// Starts an asynchronous export job.
 ///
 /// Initiates the export pipeline with the given configuration and
-/// returns a unique job ID that the frontend can use to track
-/// progress. The export runs on a background thread and does not
-/// block the UI.
-///
-/// # Parameters
-///
-/// - `config` — An [`ExportConfig`] struct specifying the output
-///   file path, codec, resolution, and all encoding parameters.
-///
-/// # Returns
-///
-/// A unique string identifier (UUID v4) for the export job. The
-/// frontend should store this ID and use it in subsequent calls
-/// to [`get_export_progress`] and [`cancel_export`].
-///
-/// # Workflow
-///
-/// ```text
-/// start_export(config) → job_id
-/// while !completed:
-///     get_export_progress(job_id) → ExportProgress
-///     update UI progress bar
-/// if error: show error to user
-/// else: notify export complete
-/// ```
-///
-/// # Error Cases
-///
-/// Returns an [`ExportError`] if:
-/// - There is no active project.
-/// - The output path is invalid or not writable.
-/// - The specified codec/format combination is unsupported.
-/// - An export job is already running for this project.
+/// returns a unique job ID that the frontend can use to track progress.
 #[tauri::command]
 pub fn start_export(
     config: ExportConfig,
@@ -217,24 +219,9 @@ pub fn start_export(
         });
     }
 
-    // Acquire locks on all required state
-    let mut export = export_state.data.lock().map_err(|e| ExportError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire export state lock: {}", e),
-    })?;
-
-    let project = project_state.data.lock().map_err(|e| ExportError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
-
-    let engine = engine_state.data.lock().map_err(|e| ExportError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire engine state lock: {}", e),
-    })?;
-
     // Verify the project is open
-    if !project.is_open() {
+    let current_project = project_state.get_current_project();
+    if current_project.is_none() {
         return Err(ExportError {
             kind: "no_active_project".into(),
             message: "No active project. Open a project before exporting.".into(),
@@ -242,7 +229,8 @@ pub fn start_export(
     }
 
     // Verify the engine is initialized
-    if !engine.is_initialized() {
+    let is_initialized = *engine_state.is_initialized.lock().unwrap();
+    if !is_initialized {
         return Err(ExportError {
             kind: "engine_not_initialized".into(),
             message: "The video engine has not been initialized. Call initialize_engine first."
@@ -250,16 +238,9 @@ pub fn start_export(
         });
     }
 
-    // Verify the codec/format combination is supported
-    engine
-        .validate_export_config(&config.format, &config.video_codec, &config.audio_codec)
-        .map_err(|e| ExportError {
-            kind: "invalid_config".into(),
-            message: format!("Unsupported export configuration: {}", e),
-        })?;
-
     // Check if an export job is already running
-    if export.has_active_job() {
+    let active_jobs = export_state.get_active_jobs();
+    if !active_jobs.is_empty() {
         return Err(ExportError {
             kind: "job_already_active".into(),
             message: "An export job is already running. Cancel it before starting a new one."
@@ -267,35 +248,17 @@ pub fn start_export(
         });
     }
 
-    // Start the export job
-    let job_id = export
-        .start_job(config, &project, &engine)
-        .map_err(|e| ExportError {
-            kind: "start_failed".into(),
-            message: format!("Failed to start export job: {}", e),
-        })?;
+    // Start the export job using the ExportState method
+    let internal_config = to_internal_config(config);
+    let job_id = export_state.create_job(internal_config);
 
     log::info!("Export job started: {}", job_id);
-    Ok(job_id)
+    Ok(job_id.to_string())
 }
 
 /// Retrieves the progress of an active export job.
 ///
-/// Returns a snapshot of the export job's current state, including
-/// the completion percentage, frames processed, estimated time
-/// remaining, and any error information. The frontend should poll
-/// this command periodically (e.g. every 500ms) while an export
-/// is running.
-///
-/// # Parameters
-///
-/// - `job_id` — The UUID of the export job to query, as returned
-///   by [`start_export`].
-///
-/// # Returns
-///
-/// An [`ExportProgress`] struct with the current job status, or an
-/// [`ExportError`] if the job ID does not exist.
+/// Returns a snapshot of the export job's current state.
 #[tauri::command]
 pub fn get_export_progress(
     job_id: String,
@@ -310,53 +273,29 @@ pub fn get_export_progress(
         });
     }
 
-    let export = export_state.data.lock().map_err(|e| ExportError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire export state lock: {}", e),
+    // Parse the job_id string to Uuid
+    let parsed_id = uuid::Uuid::parse_str(&job_id).map_err(|e| ExportError {
+        kind: "invalid_job_id".into(),
+        message: format!("Invalid job ID format '{}': {}", job_id, e),
     })?;
 
-    let progress = export.get_progress(&job_id).map_err(|e| ExportError {
-        kind: "job_not_found".into(),
-        message: format!("Export job '{}' not found: {}", job_id, e),
-    })?;
+    // Look up the job using ExportState's method
+    let job = export_state.get_job(parsed_id);
 
-    Ok(ExportProgress {
-        job_id: progress.job_id,
-        phase: progress.phase,
-        progress: progress.progress,
-        frames_processed: progress.frames_processed,
-        total_frames: progress.total_frames,
-        estimated_time_remaining: progress.estimated_time_remaining,
-        current_speed_fps: progress.current_speed_fps,
-        output_file_size: progress.output_file_size,
-        completed: progress.completed,
-        cancelled: progress.cancelled,
-        error: progress.error,
-    })
+    if job.is_none() {
+        return Err(ExportError {
+            kind: "job_not_found".into(),
+            message: format!("Export job '{}' not found.", job_id),
+        });
+    }
+
+    let job = job.unwrap();
+    Ok(job_to_progress(&job))
 }
 
 /// Cancels an active export job.
 ///
-/// Signals the export pipeline to stop processing and clean up
-/// any temporary files. The output file (if partially written)
-/// is deleted. This command returns immediately, but the actual
-/// cancellation may take a moment to propagate through the
-/// encoding pipeline.
-///
-/// # Parameters
-///
-/// - `job_id` — The UUID of the export job to cancel.
-///
-/// # Returns
-///
-/// `true` if the cancellation signal was sent successfully, or an
-/// [`ExportError`] if the job ID does not exist or the job has
-/// already completed.
-///
-/// # Note
-///
-/// After cancellation, calling [`get_export_progress`] will show
-/// `cancelled: true` once the pipeline has fully terminated.
+/// Signals the export pipeline to stop processing and clean up.
 #[tauri::command]
 pub fn cancel_export(
     job_id: String,
@@ -371,15 +310,21 @@ pub fn cancel_export(
         });
     }
 
-    let mut export = export_state.data.lock().map_err(|e| ExportError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire export state lock: {}", e),
+    // Parse the job_id string to Uuid
+    let parsed_id = uuid::Uuid::parse_str(&job_id).map_err(|e| ExportError {
+        kind: "invalid_job_id".into(),
+        message: format!("Invalid job ID format '{}': {}", job_id, e),
     })?;
 
-    export.cancel_job(&job_id).map_err(|e| ExportError {
-        kind: "cancel_failed".into(),
-        message: format!("Failed to cancel export job '{}': {}", job_id, e),
-    })?;
+    // Cancel the job using ExportState's method
+    let success = export_state.cancel_job(parsed_id);
+
+    if !success {
+        return Err(ExportError {
+            kind: "cancel_failed".into(),
+            message: format!("Export job '{}' not found or already completed.", job_id),
+        });
+    }
 
     log::info!("Export job '{}' cancellation signal sent", job_id);
     Ok(true)
@@ -388,47 +333,40 @@ pub fn cancel_export(
 /// Retrieves the list of supported export formats.
 ///
 /// Returns all container formats and their associated codec options
-/// that the current FFmpeg engine build supports. The frontend uses
-/// this to populate the export format dropdown and to validate the
-/// user's codec selections.
-///
-/// # Returns
-///
-/// A vector of [`ExportFormat`] structs, one per supported container.
-/// The list is determined by the FFmpeg libraries available on the
-/// current system.
+/// that the current FFmpeg engine build supports.
 #[tauri::command]
 pub fn get_export_formats(
     engine_state: State<EngineState>,
 ) -> Result<Vec<ExportFormat>, ExportError> {
     log::info!("Retrieving available export formats");
 
-    let engine = engine_state.data.lock().map_err(|e| ExportError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire engine state lock: {}", e),
-    })?;
-
-    if !engine.is_initialized() {
+    // Check engine is initialized
+    let is_initialized = *engine_state.is_initialized.lock().unwrap();
+    if !is_initialized {
         return Err(ExportError {
             kind: "engine_not_initialized".into(),
             message: "The video engine has not been initialized.".into(),
         });
     }
 
-    let formats = engine.get_export_formats().map_err(|e| ExportError {
-        kind: "formats_query_failed".into(),
-        message: format!("Failed to query export formats: {}", e),
-    })?;
+    // Get the static export formats from ExportState
+    let internal_formats = ExportState::get_export_formats();
 
-    let export_formats = formats
+    // Map internal formats to the command-level format
+    let export_formats: Vec<ExportFormat> = internal_formats
         .into_iter()
         .map(|f| ExportFormat {
-            format: f.format,
+            format: f.extension.clone(),
             name: f.name,
             description: f.description,
-            video_codecs: f.video_codecs,
-            audio_codecs: f.audio_codecs,
-            max_resolution: f.max_resolution,
+            video_codecs: f.codecs.clone(),
+            audio_codecs: vec!["aac".to_string(), "opus".to_string(), "mp3".to_string()],
+            max_resolution: if f.supported_resolutions.is_empty() {
+                "1920x1080".to_string()
+            } else {
+                let (w, h) = f.supported_resolutions[0];
+                format!("{}x{}", w, h)
+            },
             extension: f.extension,
         })
         .collect();

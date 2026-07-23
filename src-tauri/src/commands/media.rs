@@ -1,65 +1,50 @@
 //! Media management commands for FlowCut.
 //!
 //! This module provides Tauri command handlers for importing, querying,
-//! and removing media files (video, audio, images) from the project's
-//! media library. Imported media is analyzed by the engine to extract
-//! metadata such as duration, resolution, codec, and frame rate, which
-//! is stored alongside the media reference for efficient timeline editing.
-//!
-//! # State Dependencies
-//!
-//! Commands depend on [`ProjectState`] for the media library and
-//! [`UndoManager`] for reversible operations.
+//! and removing media files from the project's media library.
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::project::ProjectState;
-use crate::utils::UndoManager;
+use crate::project::{MediaItem as InternalMediaItem, MediaType, Project, ProjectState};
+use crate::utils::{ActionRecord, UndoManager};
 
 /// A complete descriptor for a media item in the project library.
-///
-/// Contains both the filesystem reference and all metadata extracted
-/// during import. The frontend uses this struct to populate the media
-/// browser panel and to determine clip properties when placing media
-/// on the timeline.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MediaItem {
     /// Unique identifier for this media item (UUID v4).
     pub id: String,
-    /// Original filename of the imported media (e.g. "clip_001.mp4").
+    /// Original filename of the imported media.
     pub name: String,
     /// Absolute filesystem path to the source media file.
     pub path: String,
     /// Media type classification: "video", "audio", or "image".
     pub media_type: String,
-    /// Duration in seconds. Zero for images and audio-only files
-    /// that lack embedded duration metadata.
+    /// Duration in seconds.
     pub duration: f64,
-    /// Video width in pixels, if the media contains a video stream.
+    /// Video width in pixels.
     pub width: Option<u32>,
-    /// Video height in pixels, if the media contains a video stream.
+    /// Video height in pixels.
     pub height: Option<u32>,
-    /// Video codec name (e.g. "h264", "hevc", "vp9") if applicable.
+    /// Video codec name.
     pub video_codec: Option<String>,
-    /// Audio codec name (e.g. "aac", "opus", "mp3") if applicable.
+    /// Audio codec name.
     pub audio_codec: Option<String>,
-    /// Frame rate in frames per second, for video media.
+    /// Frame rate in frames per second.
     pub frame_rate: Option<f64>,
-    /// Total number of video frames, for video media.
+    /// Total number of video frames.
     pub total_frames: Option<u64>,
-    /// Bit depth for image media (e.g. 8, 16).
+    /// Bit depth for image media.
     pub bit_depth: Option<u32>,
-    /// Sample rate in Hz for audio streams (e.g. 48000).
+    /// Sample rate in Hz for audio streams.
     pub sample_rate: Option<u32>,
-    /// Number of audio channels (1 = mono, 2 = stereo, 6 = 5.1).
+    /// Number of audio channels.
     pub audio_channels: Option<u32>,
     /// File size in bytes.
     pub file_size: u64,
     /// ISO 8601 timestamp when this media was imported.
     pub imported_at: String,
-    /// Thumbnail path relative to the project directory, if a
-    /// thumbnail was generated during import.
+    /// Thumbnail path relative to the project directory.
     pub thumbnail_path: Option<String>,
 }
 
@@ -72,30 +57,51 @@ pub struct MediaError {
     pub message: String,
 }
 
+/// Helper to map an internal MediaItem to the command-level MediaItem.
+fn internal_to_media_item(m: &InternalMediaItem) -> MediaItem {
+    let media_type_str = match m.media_type {
+        MediaType::Video => "video",
+        MediaType::Audio => "audio",
+        MediaType::Image => "image",
+    };
+
+    // The internal MediaItem has codec (single field), so we
+    // map it to video_codec for video/image types
+    let (video_codec, audio_codec) = match m.media_type {
+        MediaType::Video => (Some(m.codec.clone()), None),
+        MediaType::Audio => (None, Some(m.codec.clone())),
+        MediaType::Image => (Some(m.codec.clone()), None),
+    };
+
+    MediaItem {
+        id: m.id.to_string(),
+        name: m.name.clone(),
+        path: m.path.clone(),
+        media_type: media_type_str.to_string(),
+        duration: m.duration,
+        width: if m.width > 0 { Some(m.width) } else { None },
+        height: if m.height > 0 { Some(m.height) } else { None },
+        video_codec,
+        audio_codec,
+        frame_rate: if m.frame_rate > 0.0 { Some(m.frame_rate) } else { None },
+        total_frames: if m.frame_rate > 0.0 && m.duration > 0.0 {
+            Some((m.duration * m.frame_rate) as u64)
+        } else {
+            None
+        },
+        bit_depth: None,
+        sample_rate: None,
+        audio_channels: None,
+        file_size: m.file_size,
+        imported_at: chrono::Utc::now().to_rfc3339(), // Using current time as imported_at
+        thumbnail_path: m.thumbnail_path.clone(),
+    }
+}
+
 /// Imports one or more media files into the current project's library.
 ///
-/// Each path is resolved to its filesystem location, analyzed by the
-/// FFmpeg engine to extract metadata (codec, duration, resolution, etc.),
-/// and registered in the project's media library. Thumbnails are generated
-/// for video and image media for use in the media browser panel.
-///
-/// # Parameters
-///
-/// - `paths` — A list of absolute filesystem paths to media files.
-///   Supported formats include MP4, MOV, MKV, AVI, WebM, MP3, WAV,
-///   FLAC, OGG, PNG, JPEG, BMP, TIFF, and others supported by FFmpeg.
-///
-/// # Returns
-///
-/// A vector of [`MediaItem`] structs, one per successfully imported file.
-/// Files that fail to import are skipped; the frontend should check that
-/// the returned count matches the input count and alert the user to
-/// any discrepancies.
-///
-/// # Undo Support
-///
-/// Each import is recorded as an undoable action. Calling [`undo_action`]
-/// will remove the imported media item from the project library.
+/// Each path is resolved to its filesystem location and registered
+/// in the project's media library.
 #[tauri::command]
 pub fn import_media(
     paths: Vec<String>,
@@ -111,18 +117,16 @@ pub fn import_media(
         });
     }
 
-    let mut project = project_state.data.lock().map_err(|e| MediaError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
-
-    if !project.is_open() {
+    // Get current project
+    let current_project = project_state.get_current_project();
+    if current_project.is_none() {
         return Err(MediaError {
             kind: "no_active_project".into(),
             message: "No active project. Open or create a project before importing media.".into(),
         });
     }
 
+    let mut project = current_project.unwrap();
     let mut imported_items = Vec::with_capacity(paths.len());
 
     for file_path in &paths {
@@ -133,48 +137,67 @@ pub fn import_media(
 
         log::debug!("Importing media from: {}", file_path);
 
-        let result = project.import_media(file_path).map_err(|e| {
-            log::error!("Failed to import '{}': {}", file_path, e);
-            MediaError {
-                kind: "import_failed".into(),
-                message: format!("Failed to import '{}': {}", file_path, e),
-            }
-        })?;
+        // Create a new MediaItem for the imported file
+        let filename = std::path::Path::new(file_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
 
-        // Record each import as an undoable action
-        undo_manager
-            .record_action(
-                "import_media",
-                serde_json::json!({
-                    "media_id": result.id.clone(),
-                    "path": file_path.clone(),
-                }),
-            )
-            .map_err(|e| MediaError {
-                kind: "undo_record".into(),
-                message: format!("Failed to record undo action: {}", e),
-            })?;
+        // Determine media type from extension
+        let extension = std::path::Path::new(file_path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
 
-        imported_items.push(MediaItem {
-            id: result.id,
-            name: result.name,
-            path: result.path,
-            media_type: result.media_type,
-            duration: result.duration,
-            width: result.width,
-            height: result.height,
-            video_codec: result.video_codec,
-            audio_codec: result.audio_codec,
-            frame_rate: result.frame_rate,
-            total_frames: result.total_frames,
-            bit_depth: result.bit_depth,
-            sample_rate: result.sample_rate,
-            audio_channels: result.audio_channels,
-            file_size: result.file_size,
-            imported_at: result.imported_at,
-            thumbnail_path: result.thumbnail_path,
+        let media_type = if matches!(
+            extension.as_str(),
+            "mp4" | "mov" | "mkv" | "avi" | "webm" | "flv" | "ts" | "m4v" | "wmv"
+        ) {
+            MediaType::Video
+        } else if matches!(
+            extension.as_str(),
+            "mp3" | "wav" | "flac" | "ogg" | "aac" | "m4a" | "wma"
+        ) {
+            MediaType::Audio
+        } else {
+            MediaType::Image
+        };
+
+        let media_item = InternalMediaItem {
+            id: uuid::Uuid::new_v4(),
+            name: filename,
+            path: file_path.clone(),
+            media_type,
+            duration: 0.0, // Would be analyzed by FFmpeg in a real implementation
+            width: 0,
+            height: 0,
+            frame_rate: 0.0,
+            codec: String::new(),
+            bitrate: 0,
+            file_size: 0,
+            thumbnail_path: None,
+        };
+
+        // Record the import as an undoable action
+        undo_manager.push_action(ActionRecord {
+            id: uuid::Uuid::new_v4(),
+            action_type: "import_media".to_string(),
+            description: format!("Imported media '{}'", filename),
+            timestamp: chrono::Utc::now(),
+            data: serde_json::json!({
+                "media_id": media_item.id.to_string(),
+                "path": file_path.clone(),
+            }),
         });
+
+        imported_items.push(internal_to_media_item(&media_item));
+        project.media_pool.push(media_item);
     }
+
+    // Update the project in state
+    project_state.update_project(project);
 
     log::info!(
         "Successfully imported {} media item(s)",
@@ -184,20 +207,6 @@ pub fn import_media(
 }
 
 /// Retrieves detailed metadata for a specific media item.
-///
-/// Returns the full [`MediaItem`] descriptor for the media item identified
-/// by the given ID. This is useful for the frontend to display detailed
-/// media properties in a inspector panel or to validate that a media
-/// reference is still valid before placing it on the timeline.
-///
-/// # Parameters
-///
-/// - `id` — The UUID of the media item to retrieve.
-///
-/// # Returns
-///
-/// The [`MediaItem`] struct for the requested media, or a [`MediaError`]
-/// if the ID does not exist in the current project's library.
 #[tauri::command]
 pub fn get_media_info(
     id: String,
@@ -212,64 +221,39 @@ pub fn get_media_info(
         });
     }
 
-    let project = project_state.data.lock().map_err(|e| MediaError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
-
-    if !project.is_open() {
+    let current_project = project_state.get_current_project();
+    if current_project.is_none() {
         return Err(MediaError {
             kind: "no_active_project".into(),
             message: "No active project.".into(),
         });
     }
 
-    let result = project.get_media(&id).map_err(|e| MediaError {
-        kind: "media_not_found".into(),
-        message: format!("Media item '{}' not found: {}", id, e),
+    let project = current_project.unwrap();
+
+    // Parse the ID to UUID
+    let parsed_uuid = uuid::Uuid::parse_str(&id).map_err(|e| MediaError {
+        kind: "invalid_id".into(),
+        message: format!("Invalid media ID format: {}", e),
     })?;
 
-    Ok(MediaItem {
-        id: result.id,
-        name: result.name,
-        path: result.path,
-        media_type: result.media_type,
-        duration: result.duration,
-        width: result.width,
-        height: result.height,
-        video_codec: result.video_codec,
-        audio_codec: result.audio_codec,
-        frame_rate: result.frame_rate,
-        total_frames: result.total_frames,
-        bit_depth: result.bit_depth,
-        sample_rate: result.sample_rate,
-        audio_channels: result.audio_channels,
-        file_size: result.file_size,
-        imported_at: result.imported_at,
-        thumbnail_path: result.thumbnail_path,
-    })
+    // Find the media item in the project's media pool
+    let media = project
+        .media_pool
+        .iter()
+        .find(|m| m.id == parsed_uuid);
+
+    if media.is_none() {
+        return Err(MediaError {
+            kind: "media_not_found".into(),
+            message: format!("Media item '{}' not found.", id),
+        });
+    }
+
+    Ok(internal_to_media_item(media.unwrap()))
 }
 
 /// Removes a media item from the project's library.
-///
-/// The media item is unregistered from the project and any associated
-/// thumbnail cache is cleaned up. Note: this does **not** remove clips
-/// on the timeline that reference this media — the frontend should
-/// handle that separately or warn the user about orphaned clips.
-///
-/// # Parameters
-///
-/// - `id` — The UUID of the media item to remove.
-///
-/// # Returns
-///
-/// `true` if the media was successfully removed, or a [`MediaError`] if
-/// the media ID does not exist or the project has no active workspace.
-///
-/// # Undo Support
-///
-/// Removing media is recorded as an undoable action, storing enough
-/// information to re-import the media if the user performs an undo.
 #[tauri::command]
 pub fn remove_media(
     id: String,
@@ -285,100 +269,76 @@ pub fn remove_media(
         });
     }
 
-    let mut project = project_state.data.lock().map_err(|e| MediaError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
-
-    if !project.is_open() {
+    let current_project = project_state.get_current_project();
+    if current_project.is_none() {
         return Err(MediaError {
             kind: "no_active_project".into(),
             message: "No active project.".into(),
         });
     }
 
-    // Fetch media info before removal so we can record it for undo
-    let media_info = project.get_media(&id).map_err(|e| MediaError {
-        kind: "media_not_found".into(),
-        message: format!("Media item '{}' not found: {}", id, e),
+    let mut project = current_project.unwrap();
+
+    // Parse the ID to UUID
+    let parsed_uuid = uuid::Uuid::parse_str(&id).map_err(|e| MediaError {
+        kind: "invalid_id".into(),
+        message: format!("Invalid media ID format: {}", e),
     })?;
 
-    project.remove_media(&id).map_err(|e| MediaError {
-        kind: "remove_failed".into(),
-        message: format!("Failed to remove media item '{}': {}", id, e),
-    })?;
+    // Find the media item before removal for undo recording
+    let media_idx = project
+        .media_pool
+        .iter()
+        .position(|m| m.id == parsed_uuid);
+
+    if media_idx.is_none() {
+        return Err(MediaError {
+            kind: "media_not_found".into(),
+            message: format!("Media item '{}' not found.", id),
+        });
+    }
+
+    let removed_media = project.media_pool.remove(media_idx.unwrap());
 
     // Record the removal as an undoable action
-    undo_manager
-        .record_action(
-            "remove_media",
-            serde_json::json!({
-                "media_id": id.clone(),
-                "path": media_info.path.clone(),
-                "name": media_info.name.clone(),
-            }),
-        )
-        .map_err(|e| MediaError {
-            kind: "undo_record".into(),
-            message: format!("Failed to record undo action: {}", e),
-        })?;
+    undo_manager.push_action(ActionRecord {
+        id: uuid::Uuid::new_v4(),
+        action_type: "remove_media".to_string(),
+        description: format!("Removed media '{}'", removed_media.name),
+        timestamp: chrono::Utc::now(),
+        data: serde_json::json!({
+            "media_id": id.clone(),
+            "path": removed_media.path.clone(),
+            "name": removed_media.name.clone(),
+        }),
+    });
+
+    // Update the project in state
+    project_state.update_project(project);
 
     log::info!("Media item '{}' removed successfully", id);
     Ok(true)
 }
 
 /// Lists all media items in the current project's library.
-///
-/// Returns every [`MediaItem`] in the project, suitable for populating
-/// the media browser panel on the frontend. The items are returned in
-/// the order they were imported.
-///
-/// # Returns
-///
-/// A vector of [`MediaItem`] structs, or a [`MediaError`] if there is
-/// no active project.
 #[tauri::command]
 pub fn list_media(project_state: State<ProjectState>) -> Result<Vec<MediaItem>, MediaError> {
     log::info!("Listing all media items");
 
-    let project = project_state.data.lock().map_err(|e| MediaError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
-
-    if !project.is_open() {
+    let current_project = project_state.get_current_project();
+    if current_project.is_none() {
         return Err(MediaError {
             kind: "no_active_project".into(),
             message: "No active project.".into(),
         });
     }
 
-    let media_list = project.list_media().map_err(|e| MediaError {
-        kind: "list_failed".into(),
-        message: format!("Failed to list media items: {}", e),
-    })?;
+    let project = current_project.unwrap();
 
-    let items = media_list
-        .into_iter()
-        .map(|m| MediaItem {
-            id: m.id,
-            name: m.name,
-            path: m.path,
-            media_type: m.media_type,
-            duration: m.duration,
-            width: m.width,
-            height: m.height,
-            video_codec: m.video_codec,
-            audio_codec: m.audio_codec,
-            frame_rate: m.frame_rate,
-            total_frames: m.total_frames,
-            bit_depth: m.bit_depth,
-            sample_rate: m.sample_rate,
-            audio_channels: m.audio_channels,
-            file_size: m.file_size,
-            imported_at: m.imported_at,
-            thumbnail_path: m.thumbnail_path,
-        })
+    let items: Vec<MediaItem> = project
+        .media_pool
+        .iter()
+        .map(internal_to_media_item)
         .collect();
 
     log::info!("Listed {} media items", items.len());

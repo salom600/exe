@@ -2,76 +2,43 @@
 //!
 //! This module provides Tauri command handlers for applying, modifying,
 //! and removing visual and audio effects (filters) on timeline clips.
-//! Effects are non-destructive — they are applied as overlays on clip
-//! references and can be reordered, reconfigured, or removed at any
-//! time without altering the underlying media.
-//!
-//! # Filter Architecture
-//!
-//! Each filter instance is stored as a separate entity linked to a clip.
-//! Multiple filters can be applied to a single clip, and they are
-//! processed in order (top-to-bottom in the filter stack). Filter
-//! parameters are stored as [`serde_json::Value`] to allow flexible,
-//! extensible configuration without rigid type definitions.
-//!
-//! # State Dependencies
-//!
-//! Commands depend on [`ProjectState`] for filter storage and
-//! [`UndoManager`] for reversible operations.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::State;
 
-use crate::project::ProjectState;
-use crate::utils::UndoManager;
+use crate::project::{Clip, FilterInstance, ProjectState, Track};
+use crate::utils::{ActionRecord, UndoManager};
 
 /// Describes a filter instance applied to a clip.
-///
-/// Contains the filter's unique ID, the clip it is attached to,
-/// the filter type (e.g. "brightness", "blur", "equalizer"), and
-/// the current parameter configuration.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FilterInfo {
     /// Unique identifier for this filter instance (UUID v4).
     pub id: String,
     /// ID of the clip this filter is applied to.
     pub clip_id: String,
-    /// The filter type identifier (e.g. "brightness", "contrast",
-    /// "saturation", "blur", "sharpen", "noise_reduction",
-    /// "equalizer", "compressor", "reverb").
+    /// The filter type identifier.
     pub filter_type: String,
     /// Current parameter configuration as a JSON object.
-    /// The schema varies per filter type; see [`FilterDefinition`]
-    /// for the expected parameter structure.
     pub params: Value,
-    /// Whether this filter is currently enabled. Disabled filters
-    /// are skipped during rendering but retain their configuration.
+    /// Whether this filter is currently enabled.
     pub enabled: bool,
     /// Order index in the filter stack (0 = first applied).
     pub order: u32,
-    /// Human-readable name for this filter instance, derived from
-    /// the filter type and any user-provided label.
+    /// Human-readable name for this filter instance.
     pub name: String,
 }
 
 /// Describes a filter type definition (blueprint).
-///
-/// This is a static descriptor for a category of filters, containing
-/// the type name, description, supported parameter schema, and
-/// default parameter values. It does not represent an applied instance
-/// — it is a template that [`apply_filter`] uses to create a [`FilterInfo`].
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FilterDefinition {
-    /// The filter type identifier used in [`apply_filter`].
+    /// The filter type identifier.
     pub filter_type: String,
-    /// Human-readable category name (e.g. "Color", "Audio", "Stylize").
+    /// Human-readable category name.
     pub category: String,
     /// Short description of what the filter does.
     pub description: String,
-    /// JSON Schema describing the expected parameters for this
-    /// filter type. The frontend can use this to generate a
-    /// dynamic parameter editor UI.
+    /// JSON Schema describing the expected parameters.
     pub param_schema: Value,
     /// Default parameter values as a JSON object.
     pub default_params: Value,
@@ -90,31 +57,145 @@ pub struct FilterError {
     pub message: String,
 }
 
+/// Static list of available filter definitions.
+fn get_static_filter_definitions() -> Vec<FilterDefinition> {
+    vec![
+        FilterDefinition {
+            filter_type: "brightness".to_string(),
+            category: "Color".to_string(),
+            description: "Adjust the brightness of the video".to_string(),
+            param_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "amount": { "type": "number", "minimum": -1.0, "maximum": 1.0 }
+                }
+            }),
+            default_params: serde_json::json!({"amount": 0.0}),
+            is_video_filter: true,
+            is_audio_filter: false,
+        },
+        FilterDefinition {
+            filter_type: "contrast".to_string(),
+            category: "Color".to_string(),
+            description: "Adjust the contrast of the video".to_string(),
+            param_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "amount": { "type": "number", "minimum": -1.0, "maximum": 2.0 }
+                }
+            }),
+            default_params: serde_json::json!({"amount": 0.0}),
+            is_video_filter: true,
+            is_audio_filter: false,
+        },
+        FilterDefinition {
+            filter_type: "saturation".to_string(),
+            category: "Color".to_string(),
+            description: "Adjust the saturation of the video".to_string(),
+            param_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "amount": { "type": "number", "minimum": -1.0, "maximum": 2.0 }
+                }
+            }),
+            default_params: serde_json::json!({"amount": 0.0}),
+            is_video_filter: true,
+            is_audio_filter: false,
+        },
+        FilterDefinition {
+            filter_type: "blur".to_string(),
+            category: "Stylize".to_string(),
+            description: "Apply a Gaussian blur to the video".to_string(),
+            param_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "radius": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
+                    "type": { "type": "string", "enum": ["gaussian", "box"] }
+                }
+            }),
+            default_params: serde_json::json!({"radius": 5.0, "type": "gaussian"}),
+            is_video_filter: true,
+            is_audio_filter: false,
+        },
+        FilterDefinition {
+            filter_type: "sharpen".to_string(),
+            category: "Stylize".to_string(),
+            description: "Sharpen the video edges".to_string(),
+            param_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "amount": { "type": "number", "minimum": 0.0, "maximum": 5.0 }
+                }
+            }),
+            default_params: serde_json::json!({"amount": 1.0}),
+            is_video_filter: true,
+            is_audio_filter: false,
+        },
+        FilterDefinition {
+            filter_type: "noise_reduction".to_string(),
+            category: "Stylize".to_string(),
+            description: "Reduce noise in the video".to_string(),
+            param_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "strength": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+                }
+            }),
+            default_params: serde_json::json!({"strength": 0.5}),
+            is_video_filter: true,
+            is_audio_filter: false,
+        },
+        FilterDefinition {
+            filter_type: "equalizer".to_string(),
+            category: "Audio".to_string(),
+            description: "Apply an audio equalizer".to_string(),
+            param_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "bands": { "type": "array" }
+                }
+            }),
+            default_params: serde_json::json!({"bands": []}),
+            is_video_filter: false,
+            is_audio_filter: true,
+        },
+        FilterDefinition {
+            filter_type: "compressor".to_string(),
+            category: "Audio".to_string(),
+            description: "Apply dynamic range compression".to_string(),
+            param_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "threshold": { "type": "number" },
+                    "ratio": { "type": "number" }
+                }
+            }),
+            default_params: serde_json::json!({"threshold": -20.0, "ratio": 4.0}),
+            is_video_filter: false,
+            is_audio_filter: true,
+        },
+        FilterDefinition {
+            filter_type: "reverb".to_string(),
+            category: "Audio".to_string(),
+            description: "Apply audio reverb effect".to_string(),
+            param_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "decay": { "type": "number" },
+                    "mix": { "type": "number" }
+                }
+            }),
+            default_params: serde_json::json!({"decay": 0.5, "mix": 0.3}),
+            is_video_filter: false,
+            is_audio_filter: true,
+        },
+    ]
+}
+
 /// Applies a filter to a clip on the timeline.
 ///
 /// Creates a new filter instance of the specified type, attaches it to
-/// the given clip, and configures it with the provided parameters. If
-/// `params` is `null` or an empty object, the filter's default parameters
-/// (from [`FilterDefinition::default_params`]) are used.
-///
-/// # Parameters
-///
-/// - `clip_id` — ID of the clip to apply the filter to.
-/// - `filter_type` — The type of filter to apply (must match one of
-///   the types returned by [`list_filters`]).
-/// - `params` — A JSON object containing the filter's configuration.
-///   Keys and value types must conform to the filter's parameter schema.
-///   Pass `null` or `{}` to use defaults.
-///
-/// # Returns
-///
-/// A [`FilterInfo`] struct describing the newly created filter instance,
-/// or a [`FilterError`] if the clip does not exist, the filter type is
-/// unknown, or the parameters are invalid.
-///
-/// # Undo Support
-///
-/// Recorded as an undoable action; undoing will remove the filter.
+/// the given clip, and configures it with the provided parameters.
 #[tauri::command]
 pub fn apply_filter(
     clip_id: String,
@@ -143,105 +224,107 @@ pub fn apply_filter(
         });
     }
 
-    let mut project = project_state.data.lock().map_err(|e| FilterError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
-
-    if !project.is_open() {
+    // Get current project
+    let current_project = project_state.get_current_project();
+    if current_project.is_none() {
         return Err(FilterError {
             kind: "no_active_project".into(),
             message: "No active project.".into(),
         });
     }
 
-    // Verify the clip exists
-    let clip = project.get_clip(&clip_id).map_err(|e| FilterError {
-        kind: "clip_not_found".into(),
-        message: format!("Clip '{}' not found: {}", clip_id, e),
-    })?;
+    let mut project = current_project.unwrap();
 
     // Verify the filter type is supported
-    project
-        .validate_filter_type(&filter_type)
-        .map_err(|e| FilterError {
+    let definitions = get_static_filter_definitions();
+    let filter_def = definitions.iter().find(|d| d.filter_type == filter_type);
+    if filter_def.is_none() {
+        return Err(FilterError {
             kind: "invalid_filter_type".into(),
-            message: format!("Filter type '{}' is not supported: {}", filter_type, e),
-        })?;
+            message: format!("Filter type '{}' is not supported.", filter_type),
+        });
+    }
+
+    let filter_def = filter_def.unwrap();
 
     // Apply default params if none were provided
     let effective_params =
         if params.is_null() || (params.is_object() && params.as_object().unwrap().is_empty()) {
-            project
-                .get_filter_defaults(&filter_type)
-                .map_err(|e| FilterError {
-                    kind: "defaults_failed".into(),
-                    message: format!("Failed to get default params for '{}': {}", filter_type, e),
-                })?
+            filter_def.default_params.clone()
         } else {
-            // Validate provided params against the filter's schema
-            project
-                .validate_filter_params(&filter_type, &params)
-                .map_err(|e| FilterError {
-                    kind: "invalid_params".into(),
-                    message: format!("Invalid parameters for filter '{}': {}", filter_type, e),
-                })?;
             params
         };
 
-    let result = project
-        .apply_filter(&clip_id, &filter_type, &effective_params)
-        .map_err(|e| FilterError {
-            kind: "apply_filter_failed".into(),
-            message: format!("Failed to apply filter: {}", e),
-        })?;
+    // Parse the clip ID to UUID
+    let parsed_clip_uuid = uuid::Uuid::parse_str(&clip_id).map_err(|e| FilterError {
+        kind: "invalid_clip_id".into(),
+        message: format!("Invalid clip ID format: {}", e),
+    })?;
 
-    undo_manager
-        .record_action(
-            "apply_filter",
-            serde_json::json!({
-                "filter_id": result.id.clone(),
-                "clip_id": clip_id.clone(),
-                "filter_type": filter_type.clone(),
-                "params": effective_params.clone(),
-            }),
-        )
-        .map_err(|e| FilterError {
-            kind: "undo_record".into(),
-            message: format!("Failed to record undo action: {}", e),
-        })?;
+    // Find the clip and add the filter instance to it
+    let filter_instance = FilterInstance {
+        id: uuid::Uuid::new_v4(),
+        filter_type: filter_type.clone(),
+        params: effective_params.clone(),
+        enabled: true,
+        order: 0, // will be set to the next order in the clip's filter list
+    };
+
+    let mut clip_found = false;
+    let mut filter_order = 0;
+
+    for track in &mut project.timeline.tracks {
+        for clip in &mut track.clips {
+            if clip.id == parsed_clip_uuid {
+                filter_order = clip.filters.len() as u32;
+                let mut new_filter = filter_instance.clone();
+                new_filter.order = filter_order;
+                clip.filters.push(new_filter);
+                clip_found = true;
+                break;
+            }
+        }
+        if clip_found {
+            break;
+        }
+    }
+
+    if !clip_found {
+        return Err(FilterError {
+            kind: "clip_not_found".into(),
+            message: format!("Clip '{}' not found.", clip_id),
+        });
+    }
+
+    // Record the action for undo support
+    undo_manager.push_action(ActionRecord {
+        id: uuid::Uuid::new_v4(),
+        action_type: "apply_filter".to_string(),
+        description: format!("Applied '{}' filter to clip", filter_type),
+        timestamp: chrono::Utc::now(),
+        data: serde_json::json!({
+            "filter_id": filter_instance.id.to_string(),
+            "clip_id": clip_id.clone(),
+            "filter_type": filter_type.clone(),
+            "params": effective_params.clone(),
+        }),
+    });
+
+    // Update the project
+    project_state.update_project(project);
 
     Ok(FilterInfo {
-        id: result.id,
-        clip_id: result.clip_id,
-        filter_type: result.filter_type,
-        params: result.params,
-        enabled: result.enabled,
-        order: result.order,
-        name: result.name,
+        id: filter_instance.id.to_string(),
+        clip_id: clip_id.clone(),
+        filter_type: filter_type.clone(),
+        params: effective_params,
+        enabled: true,
+        order: filter_order,
+        name: format!("{} #{}", filter_type, filter_instance.id),
     })
 }
 
 /// Removes a filter instance from a clip.
-///
-/// Deletes the filter instance identified by the given ID. The clip
-/// returns to its previous rendering behavior without this filter's
-/// effect. Any filters above this one in the stack shift down to
-/// fill the gap in ordering.
-///
-/// # Parameters
-///
-/// - `filter_id` — The UUID of the filter instance to remove.
-///
-/// # Returns
-///
-/// `true` if the filter was successfully removed, or a [`FilterError`]
-/// if the filter ID does not exist.
-///
-/// # Undo Support
-///
-/// Recorded as an undoable action storing the filter's full configuration
-/// for potential restoration.
 #[tauri::command]
 pub fn remove_filter(
     filter_id: String,
@@ -257,108 +340,93 @@ pub fn remove_filter(
         });
     }
 
-    let mut project = project_state.data.lock().map_err(|e| FilterError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
-
-    if !project.is_open() {
+    let current_project = project_state.get_current_project();
+    if current_project.is_none() {
         return Err(FilterError {
             kind: "no_active_project".into(),
             message: "No active project.".into(),
         });
     }
 
-    // Fetch filter info before removal for undo recording
-    let filter_info = project.get_filter(&filter_id).map_err(|e| FilterError {
-        kind: "filter_not_found".into(),
-        message: format!("Filter '{}' not found: {}", filter_id, e),
+    let mut project = current_project.unwrap();
+
+    // Parse the filter ID to UUID
+    let parsed_filter_uuid = uuid::Uuid::parse_str(&filter_id).map_err(|e| FilterError {
+        kind: "invalid_filter_id".into(),
+        message: format!("Invalid filter ID format: {}", e),
     })?;
 
-    project.remove_filter(&filter_id).map_err(|e| FilterError {
-        kind: "remove_filter_failed".into(),
-        message: format!("Failed to remove filter: {}", e),
-    })?;
+    // Find and remove the filter
+    let mut filter_found = false;
+    let mut removed_filter: Option<FilterInstance> = None;
+    let mut found_clip_id: Option<String> = None;
 
-    undo_manager
-        .record_action(
-            "remove_filter",
-            serde_json::json!({
-                "filter_id": filter_id.clone(),
-                "clip_id": filter_info.clip_id.clone(),
-                "filter_type": filter_info.filter_type.clone(),
-                "params": filter_info.params.clone(),
-                "order": filter_info.order,
-            }),
-        )
-        .map_err(|e| FilterError {
-            kind: "undo_record".into(),
-            message: format!("Failed to record undo action: {}", e),
-        })?;
+    for track in &mut project.timeline.tracks {
+        for clip in &mut track.clips {
+            let filter_idx = clip.filters.iter().position(|f| f.id == parsed_filter_uuid);
+            if let Some(idx) = filter_idx {
+                removed_filter = Some(clip.filters.remove(idx));
+                found_clip_id = Some(clip.id.to_string());
+                filter_found = true;
+                // Re-order remaining filters
+                for (i, f) in clip.filters.iter_mut().enumerate() {
+                    f.order = i as u32;
+                }
+                break;
+            }
+        }
+        if filter_found {
+            break;
+        }
+    }
+
+    if !filter_found {
+        return Err(FilterError {
+            kind: "filter_not_found".into(),
+            message: format!("Filter '{}' not found.", filter_id),
+        });
+    }
+
+    let removed = removed_filter.unwrap();
+    let clip_id_str = found_clip_id.unwrap();
+
+    // Record the removal as an undoable action
+    undo_manager.push_action(ActionRecord {
+        id: uuid::Uuid::new_v4(),
+        action_type: "remove_filter".to_string(),
+        description: format!("Removed '{}' filter", removed.filter_type),
+        timestamp: chrono::Utc::now(),
+        data: serde_json::json!({
+            "filter_id": filter_id.clone(),
+            "clip_id": clip_id_str.clone(),
+            "filter_type": removed.filter_type.clone(),
+            "params": removed.params.clone(),
+            "order": removed.order,
+        }),
+    });
+
+    // Update the project
+    project_state.update_project(project);
 
     log::info!("Filter '{}' removed successfully", filter_id);
     Ok(true)
 }
 
 /// Lists all available filter type definitions.
-///
-/// Returns the catalog of all filter types that FlowCut supports,
-/// including their parameter schemas and default values. The frontend
-/// uses this to populate the effects browser panel and to generate
-/// dynamic parameter editor UIs.
-///
-/// # Returns
-///
-/// A vector of [`FilterDefinition`] structs, one per supported filter
-/// type. The list is static and does not depend on project state.
 #[tauri::command]
 pub fn list_filters(
-    project_state: State<ProjectState>,
+    _project_state: State<ProjectState>,
 ) -> Result<Vec<FilterDefinition>, FilterError> {
     log::info!("Listing available filter definitions");
 
-    let project = project_state.data.lock().map_err(|e| FilterError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
+    // Return the static filter definitions
+    let definitions = get_static_filter_definitions();
 
-    let definitions = project.list_filter_definitions().map_err(|e| FilterError {
-        kind: "list_filters_failed".into(),
-        message: format!("Failed to list filter definitions: {}", e),
-    })?;
-
-    let filter_defs = definitions
-        .into_iter()
-        .map(|d| FilterDefinition {
-            filter_type: d.filter_type,
-            category: d.category,
-            description: d.description,
-            param_schema: d.param_schema,
-            default_params: d.default_params,
-            is_video_filter: d.is_video_filter,
-            is_audio_filter: d.is_audio_filter,
-        })
-        .collect();
-
-    log::info!("Listed {} filter definitions", filter_defs.len());
-    Ok(filter_defs)
+    log::info!("Listed {} filter definitions", definitions.len());
+    Ok(definitions)
 }
 
 /// Retrieves the current parameters of a filter instance.
-///
-/// Returns the parameter configuration as a JSON object. This is
-/// useful for the frontend to populate a filter's parameter editor
-/// with the current values when the user selects a filter in the
-/// inspector panel.
-///
-/// # Parameters
-///
-/// - `filter_id` — The UUID of the filter instance to query.
-///
-/// # Returns
-///
-/// A [`serde_json::Value`] containing the filter's current parameters,
-/// or a [`FilterError`] if the filter ID does not exist.
 #[tauri::command]
 pub fn get_filter_params(
     filter_id: String,
@@ -373,49 +441,40 @@ pub fn get_filter_params(
         });
     }
 
-    let project = project_state.data.lock().map_err(|e| FilterError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
-
-    if !project.is_open() {
+    let current_project = project_state.get_current_project();
+    if current_project.is_none() {
         return Err(FilterError {
             kind: "no_active_project".into(),
             message: "No active project.".into(),
         });
     }
 
-    let filter = project.get_filter(&filter_id).map_err(|e| FilterError {
-        kind: "filter_not_found".into(),
-        message: format!("Filter '{}' not found: {}", filter_id, e),
+    let project = current_project.unwrap();
+
+    // Parse the filter ID to UUID
+    let parsed_filter_uuid = uuid::Uuid::parse_str(&filter_id).map_err(|e| FilterError {
+        kind: "invalid_filter_id".into(),
+        message: format!("Invalid filter ID format: {}", e),
     })?;
 
-    Ok(filter.params)
+    // Find the filter in the project
+    for track in &project.timeline.tracks {
+        for clip in &track.clips {
+            for filter in &clip.filters {
+                if filter.id == parsed_filter_uuid {
+                    return Ok(filter.params.clone());
+                }
+            }
+        }
+    }
+
+    Err(FilterError {
+        kind: "filter_not_found".into(),
+        message: format!("Filter '{}' not found.", filter_id),
+    })
 }
 
 /// Updates the parameters of a filter instance.
-///
-/// Replaces the filter's parameter configuration with the provided
-/// JSON object. The new parameters must conform to the filter type's
-/// schema (as defined in [`FilterDefinition::param_schema`]).
-///
-/// # Parameters
-///
-/// - `filter_id` — The UUID of the filter instance to update.
-/// - `params` — A JSON object containing the new parameter values.
-///   Partial updates are supported: only the keys present in `params`
-///   will be changed; missing keys retain their previous values.
-///
-/// # Returns
-///
-/// An updated [`FilterInfo`] struct reflecting the new parameters,
-/// or a [`FilterError`] if the filter does not exist or the
-/// parameters are invalid.
-///
-/// # Undo Support
-///
-/// Recorded as an undoable action storing both the original and new
-/// parameter values for precise restoration on undo.
 #[tauri::command]
 pub fn update_filter_params(
     filter_id: String,
@@ -443,63 +502,79 @@ pub fn update_filter_params(
         });
     }
 
-    let mut project = project_state.data.lock().map_err(|e| FilterError {
-        kind: "state_lock".into(),
-        message: format!("Failed to acquire project state lock: {}", e),
-    })?;
-
-    if !project.is_open() {
+    let current_project = project_state.get_current_project();
+    if current_project.is_none() {
         return Err(FilterError {
             kind: "no_active_project".into(),
             message: "No active project.".into(),
         });
     }
 
-    // Fetch the current filter info for undo recording
-    let original_filter = project.get_filter(&filter_id).map_err(|e| FilterError {
-        kind: "filter_not_found".into(),
-        message: format!("Filter '{}' not found: {}", filter_id, e),
+    let mut project = current_project.unwrap();
+
+    // Parse the filter ID to UUID
+    let parsed_filter_uuid = uuid::Uuid::parse_str(&filter_id).map_err(|e| FilterError {
+        kind: "invalid_filter_id".into(),
+        message: format!("Invalid filter ID format: {}", e),
     })?;
 
-    // Validate the new params against the filter type's schema
-    project
-        .validate_filter_params(&original_filter.filter_type, &params)
-        .map_err(|e| FilterError {
-            kind: "invalid_params".into(),
-            message: format!(
-                "Invalid parameters for filter '{}': {}",
-                original_filter.filter_type, e
-            ),
-        })?;
+    // Find and update the filter
+    let mut filter_found = false;
+    let mut original_params: Option<Value> = None;
+    let mut result_info: Option<FilterInfo> = None;
+    let mut found_clip_id: Option<String> = None;
 
-    let result = project
-        .update_filter_params(&filter_id, &params)
-        .map_err(|e| FilterError {
-            kind: "update_failed".into(),
-            message: format!("Failed to update filter params: {}", e),
-        })?;
+    for track in &mut project.timeline.tracks {
+        for clip in &mut track.clips {
+            for filter in &mut clip.filters {
+                if filter.id == parsed_filter_uuid {
+                    original_params = Some(filter.params.clone());
+                    filter.params = params.clone();
+                    result_info = Some(FilterInfo {
+                        id: filter.id.to_string(),
+                        clip_id: clip.id.to_string(),
+                        filter_type: filter.filter_type.clone(),
+                        params: filter.params.clone(),
+                        enabled: filter.enabled,
+                        order: filter.order,
+                        name: format!("{} #{}", filter.filter_type, filter.id),
+                    });
+                    found_clip_id = Some(clip.id.to_string());
+                    filter_found = true;
+                    break;
+                }
+            }
+            if filter_found {
+                break;
+            }
+        }
+        if filter_found {
+            break;
+        }
+    }
 
-    undo_manager
-        .record_action(
-            "update_filter_params",
-            serde_json::json!({
-                "filter_id": filter_id.clone(),
-                "original_params": original_filter.params.clone(),
-                "new_params": params.clone(),
-            }),
-        )
-        .map_err(|e| FilterError {
-            kind: "undo_record".into(),
-            message: format!("Failed to record undo action: {}", e),
-        })?;
+    if !filter_found {
+        return Err(FilterError {
+            kind: "filter_not_found".into(),
+            message: format!("Filter '{}' not found.", filter_id),
+        });
+    }
 
-    Ok(FilterInfo {
-        id: result.id,
-        clip_id: result.clip_id,
-        filter_type: result.filter_type,
-        params: result.params,
-        enabled: result.enabled,
-        order: result.order,
-        name: result.name,
-    })
+    // Record the update as an undoable action
+    undo_manager.push_action(ActionRecord {
+        id: uuid::Uuid::new_v4(),
+        action_type: "update_filter_params".to_string(),
+        description: format!("Updated filter '{}' params", filter_id),
+        timestamp: chrono::Utc::now(),
+        data: serde_json::json!({
+            "filter_id": filter_id.clone(),
+            "original_params": original_params.unwrap(),
+            "new_params": params.clone(),
+        }),
+    });
+
+    // Update the project
+    project_state.update_project(project);
+
+    Ok(result_info.unwrap())
 }
