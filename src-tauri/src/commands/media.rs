@@ -14,8 +14,8 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use flowcut_lib::project::ProjectState;
-use flowcut_lib::utils::UndoManager;
+use crate::project::ProjectState;
+use crate::utils::UndoManager;
 
 /// A complete descriptor for a media item in the project library.
 ///

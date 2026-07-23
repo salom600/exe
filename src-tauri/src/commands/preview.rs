@@ -14,8 +14,8 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use flowcut_lib::engine::EngineState;
-use flowcut_lib::project::ProjectState;
+use crate::engine::EngineState;
+use crate::project::ProjectState;
 
 /// Metadata about the preview capabilities for a media item.
 ///

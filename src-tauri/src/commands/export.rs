@@ -22,9 +22,9 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use flowcut_lib::engine::EngineState;
-use flowcut_lib::export::ExportState;
-use flowcut_lib::project::ProjectState;
+use crate::engine::EngineState;
+use crate::export::ExportState;
+use crate::project::ProjectState;
 
 /// Configuration for an export job.
 ///

@@ -20,7 +20,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use flowcut_lib::engine::EngineState;
+use crate::engine::EngineState;
 
 /// Runtime status of the video processing engine.
 ///

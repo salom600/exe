@@ -24,7 +24,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use flowcut_lib::project::ProjectState;
+use crate::project::ProjectState;
 
 /// Describes a single keyboard shortcut mapping.
 ///
@@ -182,7 +182,7 @@ pub fn set_shortcut(
         "Setting shortcut: action={}, key={}, modifiers={}",
         action,
         key,
-        modifiers
+        modifiers.join("+")
     );
 
     if action.trim().is_empty() {

@@ -23,8 +23,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::State;
 
-use flowcut_lib::project::ProjectState;
-use flowcut_lib::utils::UndoManager;
+use crate::project::ProjectState;
+use crate::utils::UndoManager;
 
 /// Describes a filter instance applied to a clip.
 ///
