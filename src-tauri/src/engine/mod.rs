@@ -150,7 +150,7 @@ pub struct SystemInfo {
 ///
 /// let state = EngineState::new();
 /// // Initially uninitialized
-/// assert!(!state.is_initialized.lock().unwrap());
+/// assert!(!*state.is_initialized.lock().unwrap());
 /// ```
 pub struct EngineState {
     /// Whether the engine has completed initialization.
@@ -207,9 +207,9 @@ impl EngineState {
     /// use flowcut_lib::engine::EngineState;
     ///
     /// let state = EngineState::new();
-    /// assert!(!state.is_initialized.lock().unwrap());
-    /// assert!(!state.ffmpeg_available.lock().unwrap());
-    /// assert!(!state.gpu_available.lock().unwrap());
+    /// assert!(!*state.is_initialized.lock().unwrap());
+    /// assert!(!*state.ffmpeg_available.lock().unwrap());
+    /// assert!(!*state.gpu_available.lock().unwrap());
     /// assert!(state.supported_formats.lock().unwrap().is_empty());
     /// assert!(state.codec_list.lock().unwrap().is_empty());
     /// ```
