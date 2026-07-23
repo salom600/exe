@@ -1,0 +1,491 @@
+/* ============================================
+   FlowCut — Core Layout & Theme Variables
+   Catppuccin Mocha Dark Theme
+   ============================================ */
+
+:root {
+    /* Core palette */
+    --bg-base: #1e1e2e;
+    --bg-mantle: #181825;
+    --bg-crust: #11111b;
+    --bg-surface0: #313244;
+    --bg-surface1: #45475a;
+    --bg-surface2: #585b70;
+    --bg-overlay0: #6c7086;
+    --bg-overlay1: #7f849c;
+    --bg-overlay2: #9399b2;
+
+    /* Text colors */
+    --fg-text: #cdd6f4;
+    --fg-subtext1: #bac2de;
+    --fg-subtext0: #a6adc8;
+    --fg-overlay2: #9399b2;
+
+    /* Accent colors */
+    --accent-blue: #89b4fa;
+    --accent-green: #a6e3a1;
+    --accent-red: #f38ba8;
+    --accent-yellow: #f9e2af;
+    --accent-purple: #cba6f7;
+    --accent-teal: #94e2d5;
+    --accent-orange: #fab387;
+    --accent-pink: #f5c2e7;
+
+    /* Semantic colors */
+    --color-primary: var(--accent-blue);
+    --color-success: var(--accent-green);
+    --color-danger: var(--accent-red);
+    --color-warning: var(--accent-yellow);
+    --color-info: var(--accent-purple);
+
+    /* Track type colors */
+    --track-video: #89b4fa;
+    --track-audio: #a6e3a1;
+    --track-text: #cba6f7;
+
+    /* Dimensions */
+    --top-bar-height: 40px;
+    --panel-header-height: 32px;
+    --timeline-min-height: 200px;
+    --timeline-default-height: 300px;
+    --status-bar-height: 28px;
+    --media-browser-width: 250px;
+    --properties-panel-width: 280px;
+    --track-header-width: 160px;
+    --track-row-height: 48px;
+
+    /* Typography */
+    --font-family: system-ui, -apple-system, 'Segoe UI', 'Noto Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-size-base: 13px;
+    --font-size-small: 11px;
+    --font-size-large: 15px;
+    --font-size-title: 18px;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-bold: 600;
+
+    /* Borders & spacing */
+    --border-color: var(--bg-surface1);
+    --border-radius: 4px;
+    --border-radius-lg: 8px;
+    --spacing-xs: 2px;
+    --spacing-sm: 4px;
+    --spacing-md: 8px;
+    --spacing-lg: 12px;
+    --spacing-xl: 16px;
+    --spacing-2xl: 24px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+    /* Transitions */
+    --transition-fast: 100ms ease;
+    --transition-normal: 200ms ease;
+    --transition-slow: 300ms ease;
+
+    /* Clip colors */
+    --clip-video-color: rgba(137, 180, 250, 0.6);
+    --clip-video-border: var(--accent-blue);
+    --clip-audio-color: rgba(166, 227, 161, 0.4);
+    --clip-audio-border: var(--accent-green);
+    --clip-image-color: rgba(203, 166, 247, 0.5);
+    --clip-image-border: var(--accent-purple);
+
+    /* Playhead */
+    --playhead-color: var(--accent-red);
+    --playhead-width: 2px;
+
+    /* Selection */
+    --selection-color: rgba(137, 180, 250, 0.3);
+    --selection-border: var(--accent-blue);
+
+    /* Snap indicator */
+    --snap-color: var(--accent-yellow);
+}
+
+/* ============================================
+   Base Reset & Global Styles
+   ============================================ */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    line-height: 1.4;
+    color: var(--fg-text);
+    background: var(--bg-base);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ============================================
+   Main Layout Grid
+   ============================================ */
+
+#top-bar {
+    height: var(--top-bar-height);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    background: var(--bg-mantle);
+    border-bottom: 1px solid var(--border-color);
+    z-index: 100;
+}
+
+#main-content {
+    flex: 1;
+    display: grid;
+    grid-template-columns: var(--media-browser-width) 1fr var(--properties-panel-width);
+    grid-template-rows: 1fr;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#timeline-area {
+    height: var(--timeline-default-height);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-mantle);
+    border-top: 1px solid var(--border-color);
+    z-index: 50;
+}
+
+#status-bar {
+    height: var(--status-bar-height);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--spacing-md);
+    background: var(--bg-crust);
+    border-top: 1px solid var(--border-color);
+    font-size: var(--font-size-small);
+    color: var(--fg-subtext0);
+    z-index: 100;
+}
+
+/* ============================================
+   Resize Handles
+   ============================================ */
+
+.resize-handle {
+    background: transparent;
+    transition: background var(--transition-fast);
+    position: relative;
+    z-index: 60;
+}
+
+.resize-handle:hover,
+.resize-handle.active {
+    background: var(--accent-blue);
+}
+
+.resize-handle[data-direction="horizontal"] {
+    width: 4px;
+    cursor: col-resize;
+}
+
+.resize-handle[data-direction="vertical"] {
+    height: 4px;
+    cursor: row-resize;
+}
+
+/* ============================================
+   Panel Header
+   ============================================ */
+
+.panel-header {
+    height: var(--panel-header-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--spacing-md);
+    background: var(--bg-surface0);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.panel-header h3 {
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    color: var(--fg-subtext1);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.panel-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+/* ============================================
+   Icon Button
+   ============================================ */
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--fg-subtext0);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.icon-btn:hover {
+    background: var(--bg-surface1);
+    color: var(--fg-text);
+}
+
+.icon-btn:active {
+    background: var(--bg-surface2);
+}
+
+/* ============================================
+   Brand / Logo
+   ============================================ */
+
+#app-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-md);
+    margin-right: var(--spacing-md);
+}
+
+.brand-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.brand-name {
+    font-size: var(--font-size-large);
+    font-weight: var(--font-weight-bold);
+    color: var(--accent-blue);
+    letter-spacing: -0.5px;
+}
+
+/* ============================================
+   Panel Hidden States
+   ============================================ */
+
+#media-browser.collapsed {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    border: none;
+}
+
+#properties-panel.collapsed {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    border: none;
+}
+
+/* ============================================
+   Scrollable Content Areas
+   ============================================ */
+
+.media-grid,
+.effects-list,
+.section-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ============================================
+   Input Styles
+   ============================================ */
+
+.prop-input {
+    background: var(--bg-surface0);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--fg-text);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-small);
+    font-family: var(--font-family);
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.prop-input:focus {
+    border-color: var(--accent-blue);
+}
+
+.prop-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.prop-input.small {
+    width: 80px;
+}
+
+.prop-unit {
+    color: var(--fg-subtext0);
+    font-size: var(--font-size-small);
+    margin-left: var(--spacing-xs);
+}
+
+.prop-value {
+    color: var(--fg-subtext0);
+    font-size: var(--font-size-small);
+    width: 30px;
+    text-align: right;
+}
+
+/* ============================================
+   Slider Styles
+   ============================================ */
+
+.slider {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--bg-surface1);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    cursor: pointer;
+    transition: transform var(--transition-fast);
+}
+
+.slider::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+}
+
+.slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    cursor: pointer;
+    border: none;
+}
+
+.slider.wide {
+    width: 100%;
+}
+
+.small-select {
+    background: var(--bg-surface0);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--fg-text);
+    padding: 2px 4px;
+    font-size: var(--font-size-small);
+    outline: none;
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+.hidden {
+    display: none !important;
+}
+
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.text-muted {
+    color: var(--fg-subtext0);
+}
+
+.text-accent {
+    color: var(--accent-blue);
+}
+
+.text-success {
+    color: var(--accent-green);
+}
+
+.text-danger {
+    color: var(--accent-red);
+}
+
+.text-warning {
+    color: var(--accent-yellow);
+}
+
+/* ============================================
+   Selection Styles
+   ============================================ */
+
+::selection {
+    background: var(--selection-color);
+    color: var(--fg-text);
+}
+
+/* ============================================
+   Focus Ring
+   ============================================ */
+
+:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

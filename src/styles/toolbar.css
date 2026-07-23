@@ -1,0 +1,190 @@
+/* ============================================
+   FlowCut — Toolbar & Menu Styles
+   ============================================ */
+
+/* Menu Bar */
+#menu-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 100%;
+}
+
+.menu-item {
+    padding: 0 10px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    font-size: var(--font-size-base);
+    color: var(--fg-subtext1);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    user-select: none;
+}
+
+.menu-item:hover,
+.menu-item.active {
+    background: var(--bg-surface0);
+    color: var(--fg-text);
+}
+
+.menu-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent-blue);
+}
+
+/* Dropdown Menus */
+#menu-dropdowns {
+    position: absolute;
+    top: var(--top-bar-height);
+    left: 0;
+    right: 0;
+    z-index: 200;
+}
+
+.dropdown {
+    position: absolute;
+    top: 0;
+    background: var(--bg-mantle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: var(--spacing-xs) 0;
+    min-width: 220px;
+    display: none;
+    animation: fadeIn var(--transition-fast);
+}
+
+.dropdown.visible {
+    display: block;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 6px 16px;
+    background: none;
+    border: none;
+    color: var(--fg-subtext1);
+    font-size: var(--font-size-base);
+    font-family: var(--font-family);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+}
+
+.dropdown-item:hover {
+    background: var(--bg-surface0);
+    color: var(--fg-text);
+}
+
+.dropdown-item.active {
+    color: var(--accent-blue);
+}
+
+.dropdown-item kbd {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-small);
+    color: var(--fg-overlay2);
+    background: var(--bg-surface1);
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-left: auto;
+}
+
+.dropdown-separator {
+    height: 1px;
+    background: var(--border-color);
+    margin: var(--spacing-xs) 8px;
+}
+
+/* Toolbar */
+#toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 0 var(--spacing-md);
+    height: 100%;
+    margin-left: auto;
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.tool-separator {
+    width: 1px;
+    height: 24px;
+    background: var(--bg-surface1);
+    margin: 0 var(--spacing-sm);
+}
+
+.tool-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--fg-subtext0);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.tool-btn:hover {
+    background: var(--bg-surface0);
+    color: var(--fg-text);
+}
+
+.tool-btn.active {
+    background: var(--accent-blue);
+    color: var(--bg-base);
+}
+
+.tool-btn:active {
+    background: var(--bg-surface2);
+    transform: scale(0.95);
+}
+
+/* Tooltips */
+.tool-btn[title]:hover::after,
+.icon-btn[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-crust);
+    color: var(--fg-text);
+    padding: 2px 8px;
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-small);
+    white-space: nowrap;
+    box-shadow: var(--shadow-sm);
+    z-index: 300;
+    pointer-events: none;
+}
+
+.tool-btn,
+.icon-btn {
+    position: relative;
+}
+
+/* Transport Toolbar */
+#transport-toolbar {
+    margin-left: var(--spacing-xl);
+    padding-left: var(--spacing-xl);
+    border-left: 1px solid var(--bg-surface1);
+}

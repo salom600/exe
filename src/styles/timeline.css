@@ -1,0 +1,330 @@
+/* ============================================
+   FlowCut — Timeline Styles
+   ============================================ */
+
+#timeline-area {
+    background: var(--bg-crust);
+}
+
+#timeline-container {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* Track Headers */
+#track-headers {
+    width: var(--track-header-width);
+    flex-shrink: 0;
+    overflow-y: auto;
+    background: var(--bg-mantle);
+    border-right: 1px solid var(--border-color);
+}
+
+.track-header {
+    height: var(--track-row-height);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-surface0);
+    transition: background var(--transition-fast);
+}
+
+.track-header:hover {
+    background: var(--bg-surface1);
+}
+
+.track-header.locked {
+    opacity: 0.6;
+}
+
+.track-header.hidden-track {
+    opacity: 0.3;
+}
+
+.track-label {
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    color: var(--track-video);
+    min-width: 24px;
+}
+
+.track-label.audio {
+    color: var(--track-audio);
+}
+
+.track-name {
+    font-size: var(--font-size-small);
+    color: var(--fg-subtext1);
+    margin-left: var(--spacing-sm);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-controls {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.track-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--fg-overlay0);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.track-btn:hover {
+    background: var(--bg-surface2);
+    color: var(--fg-text);
+}
+
+.track-btn.active {
+    color: var(--accent-red);
+}
+
+/* Time Ruler */
+#time-ruler {
+    height: 24px;
+    background: var(--bg-mantle);
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.time-marker {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    font-size: 10px;
+    color: var(--fg-overlay0);
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 2px;
+}
+
+.time-marker.major {
+    color: var(--fg-subtext1);
+    font-weight: var(--font-weight-medium);
+}
+
+/* Timeline Scroll Area */
+#timeline-scroll {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background: var(--bg-crust);
+}
+
+#timeline-canvas {
+    display: block;
+    min-width: 100%;
+}
+
+/* Playhead */
+#playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: var(--playhead-width);
+    pointer-events: none;
+    z-index: 10;
+    transition: left var(--transition-fast);
+}
+
+.playhead-head {
+    width: 12px;
+    height: 12px;
+    background: var(--playhead-color);
+    border-radius: 2px 2px 0 0;
+    position: absolute;
+    top: 0;
+    left: -5px;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.playhead-line {
+    width: var(--playhead-width);
+    background: var(--playhead-color);
+    position: absolute;
+    top: 12px;
+    bottom: 0;
+    left: 0;
+    opacity: 0.8;
+}
+
+/* Clip Blocks (rendered on canvas, but these are for HTML overlays if needed) */
+.clip-block {
+    position: absolute;
+    height: 36px;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: filter var(--transition-fast);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--spacing-sm);
+    overflow: hidden;
+    font-size: var(--font-size-small);
+}
+
+.clip-block.video {
+    background: var(--clip-video-color);
+    border: 1px solid var(--clip-video-border);
+    color: var(--fg-text);
+}
+
+.clip-block.audio {
+    background: var(--clip-audio-color);
+    border: 1px solid var(--clip-audio-border);
+    color: var(--fg-text);
+}
+
+.clip-block.image {
+    background: var(--clip-image-color);
+    border: 1px solid var(--clip-image-border);
+    color: var(--fg-text);
+}
+
+.clip-block.selected {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px var(--selection-color);
+    filter: brightness(1.2);
+}
+
+.clip-block:hover {
+    filter: brightness(1.1);
+}
+
+.clip-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: var(--font-weight-medium);
+}
+
+/* Clip Drag Handles */
+.clip-handle-left,
+.clip-handle-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    background: rgba(255, 255, 255, 0.1);
+    transition: background var(--transition-fast);
+}
+
+.clip-handle-left {
+    left: 0;
+    border-radius: var(--border-radius) 0 0 var(--border-radius);
+}
+
+.clip-handle-right {
+    right: 0;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+}
+
+.clip-handle-left:hover,
+.clip-handle-right:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Transitions between clips */
+.transition-indicator {
+    position: absolute;
+    height: 36px;
+    width: 8px;
+    background: linear-gradient(90deg, var(--clip-video-color), transparent);
+    border: 1px dashed var(--accent-yellow);
+    cursor: pointer;
+    z-index: 5;
+}
+
+/* Snap Indicator */
+.snap-indicator {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--snap-color);
+    z-index: 8;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.snap-indicator.visible {
+    opacity: 1;
+}
+
+/* Timeline Zoom Controls */
+.zoom-control {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-left: var(--spacing-md);
+}
+
+.zoom-control .slider {
+    width: 80px;
+}
+
+/* Track volume slider */
+.track-volume {
+    width: 40px;
+    height: 4px;
+    background: var(--bg-surface1);
+    border-radius: 2px;
+    margin-top: 2px;
+}
+
+/* Track row backgrounds (alternating) */
+.track-row {
+    height: var(--track-row-height);
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+}
+
+.track-row:nth-child(even) {
+    background: var(--bg-crust);
+}
+
+.track-row:nth-child(odd) {
+    background: var(--bg-mantle);
+}
+
+/* Drop zone for media drag */
+.timeline-drop-zone {
+    position: absolute;
+    border: 2px dashed var(--accent-blue);
+    background: rgba(137, 180, 250, 0.1);
+    border-radius: var(--border-radius);
+    pointer-events: none;
+    z-index: 20;
+}
+
+/* Marker on timeline */
+.timeline-marker {
+    position: absolute;
+    bottom: 0;
+    width: 2px;
+    height: 12px;
+    background: var(--accent-yellow);
+    z-index: 15;
+    cursor: pointer;
+}
+
+.timeline-marker:hover {
+    width: 4px;
+    background: var(--accent-orange);
+}

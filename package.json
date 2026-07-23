@@ -1,0 +1,19 @@
+{
+  "name": "flowcut",
+  "version": "1.0.0",
+  "description": "FlowCut — Professional Lightweight Video Editor built with Tauri, Rust, and FFmpeg",
+  "author": "FlowCut Team",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/salom600/exe.git"
+  },
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

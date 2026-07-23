@@ -1,0 +1,50 @@
+[package]
+name = "flowcut"
+version = "1.0.0"
+description = "FlowCut - Professional Lightweight Video Editor"
+authors = ["FlowCut Team"]
+license = "GPL-3.0"
+repository = "https://github.com/salom600/exe"
+edition = "2021"
+rust-version = "1.75"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-clipboard = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+env_logger = "0.11"
+thiserror = "2"
+anyhow = "1"
+rayon = "1.10"
+
+[lib]
+name = "flowcut_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

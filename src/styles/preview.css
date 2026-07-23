@@ -1,0 +1,192 @@
+/* ============================================
+   FlowCut — Preview Monitor Styles
+   ============================================ */
+
+#preview-area {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-crust);
+    border-left: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+#preview-display {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-crust);
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#preview-canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background: #000;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
+}
+
+#preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+#no-media-overlay {
+    text-align: center;
+    color: var(--fg-overlay0);
+}
+
+#no-media-overlay p {
+    margin-top: var(--spacing-md);
+    font-size: var(--font-size-base);
+}
+
+#no-media-overlay svg {
+    opacity: 0.5;
+}
+
+/* Preview Controls */
+#preview-controls {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-mantle);
+    border-top: 1px solid var(--border-color);
+    gap: var(--spacing-md);
+}
+
+.timecode-display {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base);
+    color: var(--fg-text);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-width: 180px;
+}
+
+.timecode-separator {
+    color: var(--fg-overlay0);
+    margin: 0 2px;
+}
+
+#current-timecode {
+    color: var(--accent-blue);
+    font-weight: var(--font-weight-medium);
+}
+
+#total-timecode {
+    color: var(--fg-subtext0);
+}
+
+/* Transport Controls */
+.transport-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.transport-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--fg-subtext1);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.transport-btn:hover {
+    background: var(--bg-surface0);
+    color: var(--fg-text);
+}
+
+.transport-btn:active {
+    background: var(--bg-surface2);
+    transform: scale(0.95);
+}
+
+.transport-btn.playing {
+    background: var(--accent-blue);
+    color: var(--bg-base);
+}
+
+#play-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--border-radius-lg);
+}
+
+#play-btn:hover {
+    background: var(--accent-blue);
+    color: var(--bg-base);
+}
+
+/* Volume Control */
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-left: auto;
+}
+
+.volume-icon {
+    color: var(--fg-subtext0);
+}
+
+.volume-control .slider {
+    width: 80px;
+}
+
+/* Seek bar overlay on preview */
+.preview-seek-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--bg-surface1);
+    cursor: pointer;
+    z-index: 5;
+}
+
+.preview-seek-progress {
+    height: 100%;
+    background: var(--accent-blue);
+    border-radius: 0 2px 2px 0;
+    transition: width var(--transition-fast);
+}
+
+/* Fullscreen preview */
+#preview-area.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    background: #000;
+}
+
+#preview-area.fullscreen #preview-canvas {
+    max-width: 100vw;
+    max-height: 100vh;
+}
