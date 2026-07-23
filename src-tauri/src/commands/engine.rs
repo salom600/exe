@@ -181,8 +181,8 @@ pub fn initialize_engine(engine_state: State<EngineState>) -> Result<bool, Engin
     // Perform initial engine setup: load FFmpeg libs, detect HW accel,
     // enumerate codecs
     engine_state.initialize(
-        true,      // ffmpeg_available
-        false,     // gpu_available (placeholder)
+        true,  // ffmpeg_available
+        false, // gpu_available (placeholder)
         vec![
             "mp4".to_string(),
             "mkv".to_string(),
