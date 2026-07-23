@@ -47,8 +47,6 @@
       }
     },
     "windows": {
-      "webviewFixedRuntimePath": "",
-      "wix": null,
       "nsis": {
         "languages": ["English"],
         "installMode": "currentUser"
