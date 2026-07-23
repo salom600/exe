@@ -93,7 +93,7 @@ pub struct UndoError {
 ///
 /// After an undo, the project state is modified to reflect the
 /// reversion. The frontend should call [`get_timeline_state`]
-//! or other state-query commands to refresh its views.
+/// or other state-query commands to refresh its views.
 ///
 /// # Limitations
 ///
